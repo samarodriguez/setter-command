@@ -20,59 +20,59 @@ import { makeRecognizer } from "../lib/speech";
 /* ---------- constants ---------- */
 
 const DAMAGE_ITEMS = [
-  "Missing / lifted shingles", "Granules in gutters or driveway", "Dented gutters / downspouts",
-  "Dented soft metals (vents, flashing)", "Tarp or patch visible", "Sagging roofline",
-  "Neighbor has new roof / yard sign", "Tree overhang / limb damage", "Older roof (curling, dark streaks)"
+  "Stucco cracks / spalling", "Peeling or faded paint", "Wood rot on eaves / fascia",
+  "Weathered / exposed woodwork", "Worn or curling shingles", "Damaged / sagging gutters",
+  "Water stains under eaves", "Patchy or dead lawn (turf candidate)", "Neighbor project / crew nearby"
 ];
 
 const SCRIPTS = [
   {
-    title: "Storm opener — neighbor proof",
+    title: "Opener — neighbor proof",
     tag: "Social proof + pattern interrupt",
-    body: `Hey, sorry to bug you — I'm actually not selling anything door to door today. I'm [NAME] with [COMPANY]; we're the ones doing the roof over on [STREET/NEIGHBOR]. While our crew's in the neighborhood, the adjusters flagged this block for the same storm path. Took me literally 30 seconds from the street to see a couple things on your roofline I'd want checked if it were my house. When we're back out tomorrow, would late morning or afternoon be easier for a free 15-minute look?`,
-    why: "Opens by breaking the 'salesman' frame, borrows trust from a visible neighbor job, and closes on an either/or time — never a yes/no."
+    body: `Hey, sorry to bug you — I'm not selling anything at the door today. I'm [NAME] with [COMPANY]; we're the crew doing the exterior over on [STREET/NEIGHBOR] — stucco, paint, the woodwork on the eaves. While we're already set up in the neighborhood, I'm lining up free exterior assessments on this street. Took me 30 seconds from the sidewalk to spot a couple spots on your [fascia/stucco] I'd want looked at if it were my house. When we're back out tomorrow, would late morning or afternoon be easier for a free 15-minute walk-around?`,
+    why: "Breaks the 'salesman' frame, borrows trust from a visible neighbor job, and closes on an either/or time — never a yes/no."
   },
   {
     title: "The assumptive reset (they hesitate)",
     tag: "Assumptive close",
-    body: `Totally fair — most folks on this street said the same thing until they saw the photos. Here's all it is: we get on the roof, take pictures, and hand them to you. If it's clean, you get peace of mind and never see me again. If it's not, insurance usually covers it and your rate doesn't change for storm damage. I've got tomorrow at 10:30 or 1 — which one's worse for you?`,
-    why: "'Which one's worse' is a soft-pattern-interrupt version of the alternative close; the 'never see me again' line lowers threat."
+    body: `Totally fair — most folks on this street said the same thing until they saw the walk-around. Here's all it is: we walk the outside, point out anything that's starting — wood rot, stucco cracks, failing paint — and leave you a written quote that's good whether you use us this year or in three. If everything's solid, you get peace of mind and never see me again. I've got tomorrow at 10:30 or 1 — which one's worse for you?`,
+    why: "'Which one's worse' is a soft pattern-interrupt version of the alternative close; the 'never see me again' line lowers threat."
   },
   {
     title: "Both-homeowners lock-in",
     tag: "Decision-unit control",
-    body: `One thing so I don't waste your evening — when we show the photos, it's a 20-minute sit-down and it only makes sense with both of you there, since it's an insurance decision on the house. What time tomorrow are you both actually home and not running out the door — like a solid open hour or two?`,
-    why: "Names the real reason (insurance decision) so asking for the spouse feels logical, not salesy. Anchors them to a wide-open window."
+    body: `One thing so I don't waste your evening — the walk-around takes 15 minutes and the quote conversation only makes sense with both of you there, since it's a real decision on the house. What time tomorrow are you both actually home and not running out the door — like a solid open hour?`,
+    why: "Names the real reason (a decision on the house) so asking for the spouse feels logical, not salesy. Anchors to a wide-open window."
   },
   {
     title: "Objection: 'How much is this?'",
-    tag: "Reframe",
-    body: `Great question — and honestly, maybe nothing. The inspection's free, and if there's storm damage your insurance is what pays for the roof; that's what your premiums have been buying. My job is just to document it so you don't eat a $15k roof out of pocket in three years. Fastest way to know is the 15-minute look — mornings or afternoons better?`,
-    why: "Moves price from 'cost to them' to 'money they already paid.' Ends on the appointment, not the debate."
+    tag: "Honest range + free quote",
+    body: `Straight answer: depends entirely on what we find — a fascia repair and a full repaint are different animals, and I'm not going to make up a number from your driveway. The assessment and the written quote are completely free, and because the crew's already mobilized on this street, the pricing while we're here is the best it's going to be. Fifteen minutes gets you a real number instead of a guess — mornings or afternoons better?`,
+    why: "Refusing to fake a number builds trust; 'crew already here' pricing is real, ethical urgency. Ends on the appointment, not the debate."
   },
   {
-    title: "Objection: 'I already have a roofer / a guy'",
+    title: "Objection: 'I already have a guy'",
     tag: "Aikido — agree and redirect",
-    body: `Perfect — that actually makes this easier. Get our inspection photos for free, hand them to your guy, and he can do the work. All I care about is that it gets documented before the insurance filing window closes on this storm date. Want me to grab those photos tomorrow morning?`,
-    why: "Zero resistance. You keep the appointment; the close on-site handles the rest."
+    body: `Perfect — keep him. Get our free written quote anyway: worst case it confirms your guy's pricing is fair, best case it saves you real money or catches something he hasn't seen. Either way it costs you nothing and keeps everybody honest. Want me to swing by tomorrow morning and write it up?`,
+    why: "Zero resistance. A free comparison quote threatens nobody; you keep the appointment and the close on-site handles the rest."
   },
   {
     title: "Objection: 'Not interested'",
     tag: "One-line takeaway",
-    body: `No problem at all — quick heads up before I go: the filing window on the [DATE] storm closes soon, and I'm only in this neighborhood while our crew is. If the roof's fine, the photos just prove it for when you sell. 15 minutes tomorrow, and I'm out of your hair either way — fair enough?`,
-    why: "Ethical scarcity (real deadline, real crew schedule) + a benefit even if there's no damage. 'Fair enough' gets micro-agreement."
+    body: `No problem at all — one heads up before I go: that wood rot on the fascia is the kind of thing that doubles in cost every year it sits, and I'm only on this street while our crew is. The quote's free and it's good later even if you do nothing now. 15 minutes tomorrow and I'm out of your hair either way — fair enough?`,
+    why: "A real, specific consequence (rot spreads) + real scarcity (crew schedule) + zero commitment. 'Fair enough' gets micro-agreement."
   },
   {
     title: "Callback door hanger pitch (nobody home twice)",
     tag: "Curiosity loop",
-    body: `(Write on hanger/note) "Stopped by twice — saw something on the [left/right] side of your roofline you'll want to look at before the next rain. Free photos, no obligation. Text [NAME] at [PHONE]." `,
+    body: `(Write on hanger/note) "Stopped by twice — noticed something starting on the [left/right] side of your eaves you'll want to look at before it spreads. Free look + written quote, no obligation. Text [NAME] at [PHONE]."`,
     why: "Specific + incomplete information ('the left side') creates a curiosity gap generic flyers never do."
   },
   {
     title: "Re-knock a 'not interested' 2+ weeks later",
     tag: "New reason, new frame",
-    body: `Hey — [NAME] again, different reason this time. We finished [NEIGHBOR ADDRESS] and the adjuster approved full replacement two doors down, same storm. Since the damage pattern runs down this side of the street, I'd feel bad not offering the look again. Same free 15 minutes — tomorrow work?`,
-    why: "Never re-open with the old pitch. A concrete new event resets the interaction."
+    body: `Hey — [NAME] again, different reason this time. We just wrapped [NEIGHBOR ADDRESS] — stucco and paint, came out beautiful, go look. The crew's packing up this area at the end of the month, so this is the last window for the on-street pricing. Same free 15-minute walk-around — tomorrow work?`,
+    why: "Never re-open with the old pitch. A concrete new event (finished neighbor job, crew leaving) resets the interaction."
   }
 ];
 
@@ -321,7 +321,7 @@ function HouseSheet({ house, update, close }) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center sm:justify-center" onClick={close}>
+    <div className="fixed inset-0 z-[1100] bg-black/40 flex items-end sm:items-center sm:justify-center" onClick={close}>
       <div className="bg-slate-100 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-slate-100 px-4 pt-4 pb-2 flex items-start justify-between z-10">
           <div>
@@ -355,7 +355,7 @@ function HouseSheet({ house, update, close }) {
               <A href={`https://www.zillow.com/homes/${q}_rb/`}><Home size={14} /> Zillow</A>
               <A href={`https://www.google.com/search?q=${q}+county+property+records+owner`}><Search size={14} /> County records</A>
             </div>
-            <p className="px-3 pb-3 text-[11px] text-slate-400">Satellite zoom shows the roof from above — check for patching, tarps, and discoloration before you knock. Use the county link to pull the owner's name from the assessor, then save it below.</p>
+            <p className="px-3 pb-3 text-[11px] text-slate-400">Satellite zoom shows the roof and lot from above — check the roofline, eaves, and yard condition before you knock. Use the county link to pull the owner's name from the assessor, then save it below.</p>
           </div>
 
           <PropertyLookup house={house} set={set} />
@@ -376,8 +376,8 @@ function HouseSheet({ house, update, close }) {
             {house.owner.phone && <a href={`tel:${house.owner.phone}`} className="mt-2 flex items-center gap-1 text-sm text-amber-700 font-semibold"><Phone size={14} /> Call {house.owner.phone}</a>}
           </Card>
 
-          {/* damage checklist */}
-          <Card title="Visible damage (from street / satellite)">
+          {/* exterior condition checklist */}
+          <Card title="Exterior condition (from street / satellite)">
             <div className="flex flex-wrap gap-1.5">
               {DAMAGE_ITEMS.map((it) => {
                 const on = house.damage.includes(it);
@@ -387,7 +387,7 @@ function HouseSheet({ house, update, close }) {
                 );
               })}
             </div>
-            {house.damage.length > 0 && <p className="text-[11px] text-rose-600 mt-2 font-medium">Name one of these specifically at the door — "I noticed granules piling at your downspout" beats any pitch line.</p>}
+            {house.damage.length > 0 && <p className="text-[11px] text-rose-600 mt-2 font-medium">Name one of these specifically at the door — "I noticed the fascia starting to rot on your west corner" beats any pitch line.</p>}
           </Card>
 
           {/* notes */}
@@ -465,7 +465,7 @@ function PropertyLookup({ house, set }) {
         <div className="text-sm space-y-1">
           {p.owner?.length > 0 && <Row k="Owner" v={p.owner.join(", ")} />}
           <Row k="Owner-occupied" v={p.ownerOccupied === false ? "No — likely a rental/investor" : p.ownerOccupied ? "Yes" : "—"} flag={p.ownerOccupied === false} />
-          {p.yearBuilt && <Row k="Built" v={p.yearBuilt + (p.yearBuilt < 2005 ? " (older roof likely)" : "")} />}
+          {p.yearBuilt && <Row k="Built" v={p.yearBuilt + (p.yearBuilt < 2005 ? " (original exterior likely)" : "")} />}
           {p.lastSaleDate && <Row k="Last sold" v={`${String(p.lastSaleDate).slice(0,10)}${p.lastSalePrice ? " · $" + Number(p.lastSalePrice).toLocaleString() : ""}`} />}
           {(p.bedrooms || p.squareFootage) && <Row k="Home" v={[p.bedrooms && p.bedrooms+"bd", p.bathrooms && p.bathrooms+"ba", p.squareFootage && p.squareFootage.toLocaleString()+" sqft"].filter(Boolean).join(" · ")} />}
           {p.history?.length > 1 && (
@@ -476,7 +476,7 @@ function PropertyLookup({ house, set }) {
               ))}
             </div>
           )}
-          {p.ownerOccupied === false && <p className="text-[11px] text-rose-600 font-medium pt-1">Heads up: not owner-occupied. A tenant can't authorize a roof — mark it <b>Renting</b> and move on.</p>}
+          {p.ownerOccupied === false && <p className="text-[11px] text-rose-600 font-medium pt-1">Heads up: not owner-occupied. A tenant can't authorize exterior work — mark it <b>Renting</b> and move on.</p>}
         </div>
       )}
     </div>
@@ -637,8 +637,8 @@ function Stats({ data }) {
         knockTimes: h.knocks.map((k) => new Date(k.ts).toLocaleString([], { weekday: "short", hour: "numeric" })),
         notes: (h.notes || "").slice(0, 120),
       }));
-      const out = await askClaude([{ role: "user", content: `I'm a door-to-door roofing appointment setter. Here's my knock log as JSON:\n${JSON.stringify(summary)}\nStats: ${total} knocks, ${contacts} contacts, ${appts} appointments. My dispositions are: not_home, not_int (not interested), renting, lead.\nFind patterns: best times/streets, what my notes suggest about objections I keep hitting, which not-homes to re-hit first tomorrow and at what hour, and one habit to change. Under 200 words, bullet-style, blunt and practical.` }],
-        "You are a door-to-door sales analyst. Be specific and practical, not generic.");
+      const out = await askClaude([{ role: "user", content: `I'm a door-to-door appointment setter for an exterior home-improvement company (stucco, paint, woodwork/eaves/fascia, roofing, turf — retail, no insurance claims). Here's my knock log as JSON:\n${JSON.stringify(summary)}\nStats: ${total} knocks, ${contacts} contacts, ${appts} appointments. My dispositions are: not_home, not_int (not interested), renting, lead.\nFind patterns: best times/streets, what my notes suggest about objections I keep hitting, which not-homes to re-hit first tomorrow and at what hour, and one habit to change. Under 200 words, bullet-style, blunt and practical.` }],
+        "You are a door-to-door sales analyst for retail exterior remodeling. Be specific and practical, not generic.");
       setInsight(out);
     } catch { setInsight("Couldn't run the analysis — try again."); }
     setBusy(false);

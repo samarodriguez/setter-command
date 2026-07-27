@@ -13,21 +13,21 @@ import { makeRecognizer, speak } from "../lib/speech";
 /* ---------- persona / edge-case library ---------- */
 
 const PERSONAS = [
-  { id: "skeptic", label: "The Skeptic", desc: "Arms crossed, thinks you're a scam", sys: "Deeply suspicious. Asks 'who are you really with' and 'is this one of those storm chaser things'. Softens only to specifics: real neighbor addresses, real storm dates, zero pressure." },
+  { id: "skeptic", label: "The Skeptic", desc: "Arms crossed, thinks you're a scam", sys: "Deeply suspicious. Asks 'who are you really with' and 'is this one of those door-to-door scams'. Softens only to specifics: the real neighbor job down the street, a real company name, zero pressure, no money asked up front." },
   { id: "busy", label: "Busy Parent", desc: "Kids screaming, 20 seconds of patience", sys: "A kid is yelling in the background every few lines. You interrupt, you rush, you say 'I really don't have time'. Rewards brevity; punishes long-winded pitches by starting to close the door." },
-  { id: "talker", label: "Friendly Talker", desc: "Nice but derails, never commits", sys: "Extremely friendly, tells stories about your grandkids and your old roof in Ohio. You derail every close. Only a rep who warmly interrupts and drives to an either/or time gets a commitment." },
-  { id: "price", label: "Price Shopper", desc: "Immediately asks cost, compares everyone", sys: "First question is 'how much'. You mention two other companies that already quoted you. You respect reps who reframe to insurance and free documentation instead of naming numbers." },
-  { id: "burned", label: "Burned Before", desc: "Bad storm-chaser experience", sys: "A storm chaser took your deductible and vanished two years ago. You bring it up angrily. Only local proof (crew on a nearby street, real company name, no money talk) makes progress." },
+  { id: "talker", label: "Friendly Talker", desc: "Nice but derails, never commits", sys: "Extremely friendly, tells stories about your grandkids and the paint job you did in Ohio in '02. You derail every close. Only a rep who warmly interrupts and drives to an either/or time gets a commitment." },
+  { id: "price", label: "Price Shopper", desc: "Immediately asks cost, compares everyone", sys: "First question is 'how much'. You mention two other companies that already quoted your paint job. You respect reps who give an honest 'depends on scope' answer and sell the free written quote as a comparison tool; you punish made-up numbers and evasion." },
+  { id: "burned", label: "Burned Before", desc: "Contractor took a deposit and vanished", sys: "A door-knocking contractor took a big deposit two years ago and never came back. You bring it up angrily. Only local proof (crew visibly working a nearby street, real company name, no deposit talk) makes progress." },
   { id: "renter", label: "The Renter", desc: "Doesn't own the place", sys: "You rent this house. Reveal it only if asked something that implies ownership, or after 3-4 exchanges. A sharp rep asks early, gets the landlord's info, and leaves fast. Waste the time of one who doesn't." },
   { id: "elderly", label: "Elderly Homeowner", desc: "Hard of hearing, cautious, sweet", sys: "You're 80, ask them to repeat things, mishear words. You mention your son handles house decisions. Reward patience and volume-appropriate clarity; a rep who pushes past the son is being unethical — call it out." },
-  { id: "teen", label: "Teenager Answers", desc: "Parents not home", sys: "You're 16, parents are back around 6. You know nothing about the roof. A good rep gets your parents' best time (and maybe a name) politely and leaves. Never let them pitch YOU." },
+  { id: "teen", label: "Teenager Answers", desc: "Parents not home", sys: "You're 16, parents are back around 6. You know nothing about the house. A good rep gets your parents' best time (and maybe a name) politely and leaves. Never let them pitch YOU." },
   { id: "spouse", label: "One-Legger", desc: "Spouse makes the decisions", sys: "You defer everything: 'my wife/husband handles that stuff'. You'll take a card. Only a rep who books a time when BOTH of you are home gets anywhere; if they book with just you, waffle." },
-  { id: "newroof", label: "New Roof", desc: "Replaced 2 years ago… or so they think", sys: "You say the roof was replaced 2 years ago. Actually it was 9 — you're misremembering; if asked what company did it or whether it was after the big hail year, you get unsure. A sharp rep probes gently." },
-  { id: "diy", label: "My Nephew Does Roofs", desc: "Has 'a guy' in the family", sys: "Your nephew is 'basically a roofer' (he did a shed once). You want to give him the work. Reward the 'free photos, hand them to your nephew' aikido; resist anything that competes with family." },
+  { id: "justdone", label: "'Just Painted It'", desc: "Swears it was done 2 years ago", sys: "You say the house was painted 2 years ago. Actually it was closer to 8 — you're misremembering; if asked who did it or what year exactly, you get unsure. A sharp rep probes gently and points at the visible fading/rot without calling you a liar." },
+  { id: "diy", label: "My Nephew Does This", desc: "Has 'a guy' in the family", sys: "Your nephew is 'basically a contractor' (he built a deck once). You want to give him the work. Reward the 'free quote — hand it to your nephew, keeps everyone honest' aikido; resist anything that competes with family." },
   { id: "nosolicit", label: "No-Soliciting Sign", desc: "Points at the sign, already angry", sys: "You open with 'can't you read the sign?'. Hostile for the first 2 exchanges. You only stay on the porch if the rep is disarmingly honest and specific about the neighbor job. Slam the door on any script-y line." },
-  { id: "conspiracy", label: "The Interrogator", desc: "'How'd you get my address?'", sys: "Suspicious of data privacy: 'how do you know my roof', 'are you taking pictures of my house', 'who sent you'. Calms down only with a transparent, plain explanation and zero defensiveness." },
-  { id: "denied", label: "Insurance Denied Before", desc: "Filed last year, got denied", sys: "You filed a claim last year and got denied; you believe filing again raises your rates. You know a little insurance vocabulary. Reward a rep who explains re-inspection after a NEW storm date without giving illegal advice." },
-  { id: "selling", label: "Selling the House", desc: "Listing it next month", sys: "You're listing the house next month and don't want to spend a dime. You perk up ONLY if the rep connects a documented roof (or an insurance-paid replacement) to inspection reports and sale price." },
+  { id: "conspiracy", label: "The Interrogator", desc: "'How'd you get my address?'", sys: "Suspicious of data privacy: 'how do you know my house needs work', 'are you taking pictures of my house', 'who sent you'. Calms down only with a transparent, plain explanation and zero defensiveness." },
+  { id: "broke", label: "Money's Tight", desc: "'We can't afford anything right now'", sys: "You lead with 'money's tight' and mean it. You get defensive if the rep pushes spending. Reward a rep who books the FREE assessment with zero commitment, mentions phasing the work or starting with the urgent piece (rot spreads), and never gets pushy about budget." },
+  { id: "selling", label: "Selling the House", desc: "Listing it next month", sys: "You're listing the house next month and don't want to spend a dime. You perk up ONLY if the rep connects exterior condition (paint, stucco, fascia) to curb appeal, inspection findings, and sale price." },
   { id: "dog", label: "Dog Chaos", desc: "Two big dogs, constant barking", sys: "Two huge dogs bark through the whole conversation. You keep turning to yell at them mid-sentence and losing the thread. Reward a rep who stays unfazed, keeps it short, and repeats the close cleanly." },
 ];
 
@@ -35,16 +35,16 @@ const PERSONAS = [
 
 const SECTIONS = [
   { id: "opener", label: "The Opener", desc: "Door just opened. Nail the first 15 seconds.", context: "The door has just opened. You have no idea who this is.", first: "*opens door* …Yeah?" },
-  { id: "hesitation", label: "Post-opener hesitation", desc: "They didn't say no — they stalled.", context: "The rep already gave a decent opener about storm damage and a free inspection. You're mildly interested but stalling.", first: "Hmm… I don't know. We're pretty busy this week, and honestly the roof looks fine to me." },
-  { id: "price", label: "'How much is this?'", desc: "Reframe from price to insurance.", context: "The rep introduced a free storm-damage inspection. Your immediate reflex is cost.", first: "Okay, but how much is this gonna cost me? Because every one of you guys says 'free' and then there's a bill." },
+  { id: "hesitation", label: "Post-opener hesitation", desc: "They didn't say no — they stalled.", context: "The rep already gave a decent opener about a free exterior assessment (stucco, paint, woodwork). You're mildly interested but stalling.", first: "Hmm… I don't know. We're pretty busy this week, and honestly the house looks fine to me." },
+  { id: "price", label: "'How much is this?'", desc: "Honest range + free quote, no fake numbers.", context: "The rep introduced a free exterior assessment and written quote. Your immediate reflex is cost — and you punish evasion AND made-up numbers.", first: "Okay, but ballpark — what does something like this cost? Because every one of you guys says 'free' and then there's a bill." },
   { id: "notint", label: "'Not interested'", desc: "The takeaway close, under pressure.", context: "The rep just finished their opener. You're brushing them off on autopilot, hand on the door.", first: "Yeah, no — not interested. We're good, thanks." },
-  { id: "haveguy", label: "'I already have a roofer'", desc: "Agree and redirect without competing.", context: "The rep offered the inspection. You have a roofer you trust from years back.", first: "Appreciate it, but we've got a guy. He's done all our work for fifteen years." },
-  { id: "insurance", label: "'My rates will go up'", desc: "Handle the premium fear correctly.", context: "The rep mentioned insurance covering storm damage. You are worried about premiums.", first: "See, that's the thing — the second I file a claim, my insurance goes through the roof. No pun intended. Why would I risk that?" },
-  { id: "scam", label: "'This is a scam'", desc: "Storm-chaser accusation, head on.", context: "The rep is mid-pitch. You've seen news stories about roofing scams after storms.", first: "You know what, my neighbor warned me about you guys. Knock on doors after a storm, take the deductible, disappear. Why should I believe you're any different?" },
-  { id: "spouse", label: "Spouse lock-in", desc: "Get BOTH homeowners at the sit.", context: "You've agreed a roof look makes sense. The rep now needs a time when both homeowners are home. You keep offering times when your spouse is out.", first: "Sure, come by whenever. Tomorrow at noon works — my husband's at work but I'll be here." },
+  { id: "haveguy", label: "'I already have a guy'", desc: "Agree and redirect without competing.", context: "The rep offered the free quote. You have a painter/handyman you trust from years back.", first: "Appreciate it, but we've got a guy. He's done all our work for fifteen years." },
+  { id: "broke", label: "'Money's tight right now'", desc: "Book the free look without pushing budget.", context: "The rep offered the assessment. Money genuinely is tight for you this year and you're a little embarrassed about it.", first: "Honestly? It's just not in the budget right now. Maybe next year." },
+  { id: "scam", label: "'This is a scam'", desc: "Door-to-door contractor distrust, head on.", context: "The rep is mid-pitch. You've seen news stories about door-knocking contractors taking deposits and disappearing.", first: "You know what, my neighbor warned me about you guys. Knock on doors, take a deposit, disappear. Why should I believe you're any different?" },
+  { id: "spouse", label: "Spouse lock-in", desc: "Get BOTH homeowners at the sit.", context: "You've agreed a walk-around makes sense. The rep now needs a time when both homeowners are home. You keep offering times when your spouse is out.", first: "Sure, come by whenever. Tomorrow at noon works — my husband's at work but I'll be here." },
   { id: "close", label: "The either/or close", desc: "Land the time without a yes/no.", context: "The conversation went well. You're warm and basically convinced — but if the rep asks a yes/no question or gets vague about timing, you drift and say you'll 'call them'.", first: "Alright, you make a decent case. So… what, I call you guys when we're ready or how's this work?" },
-  { id: "reknock", label: "Re-knock (said no before)", desc: "New reason, new frame — 2 weeks later.", context: "This rep knocked two weeks ago and you said no. They're back. If they reuse the old pitch, shut it down. A genuinely NEW reason (neighbor's approval, adjuster on the street) reopens you.", first: "*opens door, recognizes you* You again? I told you last time we're not interested." },
-  { id: "callback", label: "Callback follow-through", desc: "They found your door hanger.", context: "You found the rep's door hanger saying they saw something on the left side of your roofline. Curiosity got you — but you're guarded.", first: "Hey, you're the one who left that note, right? What exactly did you see on my roof?" },
+  { id: "reknock", label: "Re-knock (said no before)", desc: "New reason, new frame — 2 weeks later.", context: "This rep knocked two weeks ago and you said no. They're back. If they reuse the old pitch, shut it down. A genuinely NEW reason (finished neighbor job, crew leaving the area) reopens you.", first: "*opens door, recognizes you* You again? I told you last time we're not interested." },
+  { id: "callback", label: "Callback follow-through", desc: "They found your door hanger.", context: "You found the rep's door hanger saying they noticed something starting on the left side of your eaves. Curiosity got you — but you're guarded.", first: "Hey, you're the one who left that note, right? What exactly did you see on my house?" },
   { id: "comeback", label: "'Just leave a card'", desc: "Convert the brush-off into a time.", context: "The rep gave the opener. You're using the classic polite escape.", first: "Tell you what — just leave a card and if we're interested we'll give you a call, okay?" },
 ];
 
@@ -53,27 +53,27 @@ const SECTIONS = [
 const OBJECTIONS = [
   "Not interested. *starts closing the door*",
   "How much is this going to cost me?",
-  "We already have a roofer we trust.",
-  "If I file a claim my insurance rates will skyrocket.",
-  "You're one of those storm chasers, aren't you?",
-  "The roof is fine. It's not even that old.",
+  "We already have a painter we trust.",
+  "We just painted the house two years ago.",
+  "You're one of those door-to-door scammers, aren't you?",
+  "The house is fine. We're not doing any projects this year.",
   "I need to talk to my wife first.",
   "Just leave a card and we'll call you.",
-  "My insurance already denied a roof claim last year.",
+  "Money's tight right now — maybe next year.",
   "We're selling the house — not putting a dime into it.",
   "I don't do business with door-to-door people. Ever.",
-  "My nephew does roofing, he'll take care of it.",
+  "My nephew does this kind of work, he'll take care of it.",
   "How did you even get into this neighborhood? There's a gate.",
   "I'm renting — you'd have to talk to the landlord.",
-  "We just got the roof done two years ago.",
+  "The HOA handles all the exterior stuff here anyway.",
   "I've had three of you guys knock this week. Three.",
   "Can't you read the no-soliciting sign?",
   "I'm literally walking out the door right now.",
-  "What's in it for you? Nobody does free inspections.",
-  "The last company took our deductible and disappeared.",
+  "What's in it for you? Nobody does free assessments.",
+  "The last contractor took our deposit and disappeared.",
 ];
 
-const BASE_RULES = `You are roleplaying a homeowner in a door-to-door sales training simulator for a roofing/storm-damage appointment setter.
+const BASE_RULES = `You are roleplaying a homeowner in a door-to-door sales training simulator for an appointment setter at an exterior home-improvement company (stucco repair, exterior paint, woodwork/eaves/fascia repair, roofing, turf). This is RETAIL work — the homeowner pays directly; there are NO insurance claims involved and the rep should never bring insurance up. The rep's goal is booking a free exterior walk-around assessment + written quote, ideally with both homeowners present.
 Rules: Stay fully in character as the homeowner. Reply in 1-3 short spoken sentences, natural and realistic — interruptions, hesitation, real objections, occasional *actions in asterisks*. Never break character, never give coaching, never mention being an AI. If the rep is pushy or robotic, get colder. If the rep genuinely earns it, agree to a specific appointment time (with both homeowners when that applies) — do not agree before they earn it.`;
 
 const DIFF_RULES = {
@@ -106,7 +106,7 @@ export default function TrainTab() {
       </div>
 
       <ModeCard onClick={() => setMode("full")} icon={DoorOpen} title="Full door" color="text-amber-500"
-        desc={`Complete knock, opener to close. ${PERSONAS.length} personas covering the edge cases — renters, no-soliciting signs, denied claims, one-leggers, teens, dogs.`} />
+        desc={`Complete knock, opener to close. ${PERSONAS.length} personas covering the edge cases — renters, no-soliciting signs, tight budgets, one-leggers, teens, dogs.`} />
       <ModeCard onClick={() => setMode("section")} icon={Target} color="text-emerald-500" title="Drill a section"
         desc={`Pick where the conversation starts — the opener, "how much", spouse lock-in, the either/or close, a re-knock — and rep that exact moment over and over.`} />
       <ModeCard onClick={() => setMode("gauntlet")} icon={Zap} color="text-rose-500" title="Objection gauntlet"
@@ -241,8 +241,8 @@ function Sim({ title, sys, seed, onExit, intro }) {
     try {
       const transcript = msgs.map((m) => `${m.role === "user" ? "REP" : "HOMEOWNER"}: ${m.content}`).join("\n") || "(conversation hasn't started)";
       const h = await askClaude(
-        [{ role: "user", content: `Door-knocking roleplay in progress. Situation: ${title}. Transcript:\n${transcript}\n\nWhisper ONE line the rep should say next, and a 5-10 word reason. Format: LINE: "..." — WHY: ...` }],
-        "You are an elite door-to-door sales coach whispering in the rep's earpiece. One line only.");
+        [{ role: "user", content: `Door-knocking roleplay in progress (exterior home-improvement setter — stucco/paint/woodwork/roof/turf, retail, NO insurance claims). Situation: ${title}. Transcript:\n${transcript}\n\nWhisper ONE line the rep should say next, and a 5-10 word reason. Format: LINE: "..." — WHY: ...` }],
+        "You are an elite door-to-door sales coach whispering in the rep's earpiece. One line only. Never suggest insurance-claim angles — this company sells exterior work retail.");
       setHint(h);
     } catch { setHint("Coach unavailable — trust your gut."); }
     setBusy(false);
@@ -254,8 +254,8 @@ function Sim({ title, sys, seed, onExit, intro }) {
     try {
       const transcript = msgs.map((m) => `${m.role === "user" ? "REP" : "HOMEOWNER"}: ${m.content}`).join("\n");
       const fb = await askClaude(
-        [{ role: "user", content: `Score this door-knocking roleplay for the REP (an appointment setter). Scenario: ${title}. Transcript:\n${transcript}\n\nGive a rubric, 0-2 points each (total /10):\n1) Opener / frame control\n2) Discovery & damage specifics\n3) Objection handling\n4) Close control (either/or time, no yes/no questions)\n5) Both-homeowners lock-in\nThen: Best moment. Biggest miss. One exact line to say differently (write the line). Under 170 words, coach-style, blunt.` }],
-        "You are an elite door-to-door sales coach. Be direct, specific, and practical.");
+        [{ role: "user", content: `Score this door-knocking roleplay for the REP (an exterior home-improvement appointment setter — stucco/paint/woodwork/roof/turf, retail, NO insurance claims). Scenario: ${title}. Transcript:\n${transcript}\n\nGive a rubric, 0-2 points each (total /10):\n1) Opener / frame control\n2) Discovery & exterior specifics (pointing at real conditions: rot, cracks, fading)\n3) Objection handling\n4) Close control (either/or time, no yes/no questions)\n5) Both-homeowners lock-in\nThen: Best moment. Biggest miss. One exact line to say differently (write the line). Under 170 words, coach-style, blunt.` }],
+        "You are an elite door-to-door sales coach for retail exterior remodeling. Be direct, specific, and practical. Never coach insurance-claim angles.");
       setFeedback(fb);
     } catch { setFeedback("Couldn't reach the coach — try again."); }
     setBusy(false);
@@ -316,8 +316,8 @@ function Gauntlet({ back }) {
     setInput(""); setBusy(true);
     try {
       const out = await askClaude(
-        [{ role: "user", content: `Objection drill for a roofing/storm-damage appointment setter.\nHOMEOWNER OBJECTION: "${objection}"\nREP'S RESPONSE: "${t}"\n\nScore the response 0-10 (10 = agrees + redirects + ends on an either/or time or clear next step; deduct for arguing, price talk, robotic lines, yes/no closes, giving up). Reply in EXACTLY this format:\nSCORE: n/10\nWHY: one blunt sentence\nBETTER: the exact line a top rep would say` }],
-        "You are an elite door-to-door sales coach grading objection handling. Strict but fair. Follow the output format exactly.");
+        [{ role: "user", content: `Objection drill for an exterior home-improvement appointment setter (stucco/paint/woodwork/eaves/fascia/roof/turf — retail, homeowner pays directly, NO insurance claims).\nHOMEOWNER OBJECTION: "${objection}"\nREP'S RESPONSE: "${t}"\n\nScore the response 0-10 (10 = agrees + redirects + ends on an either/or time or clear next step; deduct for arguing, made-up prices, insurance talk, robotic lines, yes/no closes, giving up). Reply in EXACTLY this format:\nSCORE: n/10\nWHY: one blunt sentence\nBETTER: the exact line a top rep would say` }],
+        "You are an elite door-to-door sales coach grading objection handling for retail exterior remodeling. Strict but fair. Follow the output format exactly.");
       const scoreMatch = out.match(/SCORE:\s*(\d+(?:\.\d+)?)/i);
       const score = scoreMatch ? Math.min(10, parseFloat(scoreMatch[1])) : null;
       setScores((s) => [...s, { objection, response: t, score, out }]);

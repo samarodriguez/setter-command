@@ -19,11 +19,11 @@ const GOALS = [
 ];
 
 const TEMPLATES = [
-  { id: "confirm", label: "Confirm", make: (h, first) => `hey ${first}, it's the roof guy from earlier — still good for ${h.appt?.label || "our appointment"}? both of you gonna be home?` },
+  { id: "confirm", label: "Confirm", make: (h, first) => `hey ${first}, it's the exterior guy from earlier — still good for ${h.appt?.label || "our appointment"}? both of you gonna be home?` },
   { id: "onmyway", label: "On my way", make: (h, first) => `hey ${first}, heading your way now — see you in about 15` },
-  { id: "nudge", label: "Nudge", make: (h, first) => `hey ${first}, crew's back on your street tomorrow. still want me to grab those roof photos? takes 15 min` },
-  { id: "card", label: "Left card", make: (h, first) => `hey, this is the roofing inspector who left a card at ${h.address} — saw a couple things on the roofline worth a free look. tomorrow morning or afternoon work?` },
-  { id: "thanks", label: "Thanks", make: (h, first) => `${first ? first + ", " : ""}thanks for letting us take a look today — photos are with the team and I'll text you as soon as I hear back` },
+  { id: "nudge", label: "Nudge", make: (h, first) => `hey ${first}, crew's back on your street tomorrow. still want that free exterior quote? takes 15 min and it's good whenever you're ready` },
+  { id: "card", label: "Left card", make: (h, first) => `hey, this is the guy who left a card at ${h.address} — noticed some wear starting on the eaves worth a free look. tomorrow morning or afternoon work?` },
+  { id: "thanks", label: "Thanks", make: (h, first) => `${first ? first + ", " : ""}thanks for walking the house with us today — writing up your quote now and I'll text it over as soon as it's ready` },
 ];
 
 const fmtTs = (ts) => new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -134,7 +134,7 @@ function Thread({ house, update, back }) {
     try {
       const txt = await askClaude(
         [{ role: "user", content: `Write 3 different text options. Recipient: ${first || "the homeowner"} at ${house.address}. Goal: ${goalText}. ${house.appt ? "Their appointment is " + house.appt.label + "." : ""} ${house.notes ? "What I know about them: " + house.notes.slice(0, 200) + "." : ""} ${thread ? "Conversation so far:\n" + thread : ""} Output ONLY the 3 messages, separated by a line containing exactly three dashes (---). No numbering, no labels.` }],
-        `You write short, natural, human-sounding text messages for a door-to-door roofing appointment setter. They must read like a real person texted them from their phone — casual, warm, lowercase-ish, no corporate tone, no emojis unless natural, under 320 characters. NEVER sound like a mass text or a bot. ${voice ? "Match this rep's texting voice: " + voice : ""}`,
+        `You write short, natural, human-sounding text messages for a door-to-door appointment setter at an exterior home-improvement company (stucco, exterior paint, woodwork/eaves/fascia, roofing, turf). Retail work — homeowners pay directly; NEVER mention insurance or claims. They must read like a real person texted them from their phone — casual, warm, lowercase-ish, no corporate tone, no emojis unless natural, under 320 characters. NEVER sound like a mass text or a bot. ${voice ? "Match this rep's texting voice: " + voice : ""}`,
         { effort: "low" });
       let parts = txt.split(/\n\s*-{3,}\s*\n?/).map((s) => s.trim()).filter(Boolean);
       if (parts.length < 2) parts = txt.split(/\n(?=\s*\d[\).\s])/).map((s) => s.replace(/^\s*\d[\).]?\s*/, "").trim()).filter(Boolean);
