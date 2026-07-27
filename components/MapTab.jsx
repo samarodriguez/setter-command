@@ -5,11 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Crosshair, Radar, Plus, Radio, Square, Loader2, MapPin } from "lucide-react";
 import { getPosition, reverseGeocode, haversineMeters, statusFromDwell } from "../lib/geo";
-
-const STATUS_COLOR = {
-  "": "#94a3b8", not_home: "#64748b", callback: "#0ea5e9", talked: "#6366f1",
-  appt: "#10b981", not_int: "#f59e0b", dnk: "#f43f5e",
-};
+import { STATUS_COLOR } from "../lib/constants";
 function pin(color, me) {
   const size = me ? 18 : 26;
   return L.divIcon({
@@ -68,7 +64,8 @@ export default function MapTab({ data, update, onOpen, statuses }) {
     update((d) => d.houses.unshift({
       id, address: g || `Dropped pin`, lat: latlng.lat, lng: latlng.lng,
       city: "", state: "", zip: "", owner: { first: "", last: "", phone: "", email: "" },
-      status: "", notes: "", damage: [], knocks: [], appt: null, property: null, createdAt: Date.now(),
+      status: "", notes: "", damage: [], knocks: [], appt: null, property: null,
+      texts: [], followUpAt: null, createdAt: Date.now(),
     }));
     setBusy(false);
     onOpen(id);
@@ -103,10 +100,14 @@ export default function MapTab({ data, update, onOpen, statuses }) {
           const prev = doors.find((h) => h.id === enterRef.current.id);
           if (prev && secs >= 5 && !prev.status) {
             const sug = statusFromDwell(secs);
-            update((d) => {
-              const x = d.houses.find((y) => y.id === prev.id);
-              if (x && !x.status) { x.status = sug.id; x.knocks.push({ ts: Date.now(), status: sug.id, dwell: secs, auto: true }); }
-            });
+            // Only auto-log the unambiguous case (short dwell = not home);
+            // if someone answered, the rep picks NI / Renting / Lead themselves.
+            if (sug.id) {
+              update((d) => {
+                const x = d.houses.find((y) => y.id === prev.id);
+                if (x && !x.status) { x.status = sug.id; x.knocks.push({ ts: Date.now(), status: sug.id, dwell: secs, auto: true }); }
+              });
+            }
           }
           enterRef.current = null;
         }

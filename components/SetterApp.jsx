@@ -3,29 +3,21 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import TextsTab from "./TextsTab";
+import TrainTab from "./TrainTab";
+import QuickFill from "./QuickFill";
 const MapTab = dynamic(() => import("./MapTab"), { ssr: false, loading: () => <div className="p-10 text-center text-slate-400">Loading map…</div> });
 import {
-  DoorOpen, CalendarClock, MessageSquareText, Mic, MicOff, BarChart3,
-  Download, MapPin, Satellite, Search, Phone, Plus, X, ChevronRight,
-  Home, Ban, Clock, CheckCircle2, UserX, RotateCcw, Volume2, VolumeX,
-  Sparkles, Send, Trash2, ExternalLink, ClipboardList, Flame,
-  Map as MapIcon, MessageSquare, Building2, Loader2, FileText
+  DoorOpen, CalendarClock, Mic, MicOff, BarChart3,
+  Download, Satellite, Search, Phone, Plus, X, ChevronRight,
+  Home, Sparkles, Trash2, ExternalLink, ClipboardList, Flame,
+  Map as MapIcon, MessageSquare, Building2, Loader2, FileText,
+  Share2, ClipboardCopy, AlertTriangle
 } from "lucide-react";
+import { STATUSES, statusMeta, HOURS, DAY_NAMES, fmtHour, uid, askClaude, sameDay } from "../lib/constants";
+import { buildExport, toCSV, shareOrDownloadCSV } from "../lib/repcard";
+import { makeRecognizer } from "../lib/speech";
 
 /* ---------- constants ---------- */
-
-const HOURS = { 0: null, 1: [10, 17], 2: [13, 19], 3: [10, 19], 4: [10, 19], 5: [10, 18], 6: [10, 17] };
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-const STATUSES = [
-  { id: "not_home", label: "Not home", icon: Home, cls: "bg-slate-200 text-slate-700" },
-  { id: "callback", label: "Callback", icon: RotateCcw, cls: "bg-sky-100 text-sky-800" },
-  { id: "talked", label: "Talked", icon: MessageSquareText, cls: "bg-indigo-100 text-indigo-800" },
-  { id: "appt", label: "Appt set", icon: CheckCircle2, cls: "bg-emerald-100 text-emerald-800" },
-  { id: "not_int", label: "Not interested", icon: UserX, cls: "bg-amber-100 text-amber-800" },
-  { id: "dnk", label: "Do not knock", icon: Ban, cls: "bg-rose-100 text-rose-800" },
-];
-const statusMeta = (id) => STATUSES.find((s) => s.id === id) || STATUSES[0];
 
 const DAMAGE_ITEMS = [
   "Missing / lifted shingles", "Granules in gutters or driveway", "Dented gutters / downspouts",
@@ -84,39 +76,39 @@ const SCRIPTS = [
   }
 ];
 
-const PERSONAS = [
-  { id: "skeptic", label: "The Skeptic", desc: "Arms crossed, thinks you're a scam" },
-  { id: "busy", label: "Busy Parent", desc: "Kids screaming, 20 seconds of patience" },
-  { id: "talker", label: "Friendly Talker", desc: "Nice but derails, never commits" },
-  { id: "price", label: "Price Shopper", desc: "Immediately asks cost, compares everyone" },
-  { id: "burned", label: "Burned Before", desc: "Bad experience with a storm chaser" },
-];
+/* ---------- storage + migration ---------- */
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+const STATUS_MIGRATION = { talked: "lead", callback: "lead", appt: "lead", dnk: "not_int" };
 
-/* ---------- storage ---------- */
+function migrate(data) {
+  if (!data || data.v >= 2) return data;
+  for (const h of data.houses || []) {
+    if (STATUS_MIGRATION[h.status]) h.status = STATUS_MIGRATION[h.status];
+    for (const k of h.knocks || []) if (STATUS_MIGRATION[k.status]) k.status = STATUS_MIGRATION[k.status];
+    if (!h.texts) h.texts = [];
+    if (h.followUpAt === undefined) h.followUpAt = null;
+  }
+  data.v = 2;
+  return data;
+}
 
 async function loadData() {
   try {
     const r = localStorage.getItem("setter-command-v1");
-    return r ? JSON.parse(r) : null;
+    return r ? migrate(JSON.parse(r)) : null;
   } catch { return null; }
 }
 async function saveData(data) {
   try { localStorage.setItem("setter-command-v1", JSON.stringify(data)); } catch (e) { console.error(e); }
 }
 
-/* ---------- claude ---------- */
-
-async function askClaude(messages, system) {
-  const res = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, system }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(typeof data.error === "string" ? data.error : "API error");
-  return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+export function newHouse(fields = {}) {
+  return {
+    id: uid(), address: "", city: "", state: "", zip: "",
+    owner: { first: "", last: "", phone: "", email: "" },
+    status: "", notes: "", damage: [], knocks: [], appt: null, property: null,
+    texts: [], followUpAt: null, createdAt: Date.now(), ...fields,
+  };
 }
 
 /* ---------- scheduling ---------- */
@@ -127,18 +119,12 @@ function nextWorkDay(from) {
   while (!HOURS[d.getDay()]) d.setDate(d.getDate() + 1);
   return d;
 }
-function fmtHour(h) {
-  const hr = Math.floor(h), min = Math.round((h - hr) * 60);
-  const ampm = hr >= 12 ? "PM" : "AM";
-  const h12 = hr % 12 === 0 ? 12 : hr % 12;
-  return `${h12}:${min === 0 ? "00" : min} ${ampm}`;
-}
 function buildSlots(date) {
   const [start, end] = HOURS[date.getDay()];
   const dow = date.getDay();
   const slots = [];
   for (let t = start; t <= end - 1; t += 0.5) {
-    const buffer = end - t; // hours left in YOUR day after slot start
+    const buffer = end - t;
     let score = 0; const reasons = [];
     if (buffer >= 2.5) { score += 3; reasons.push("big open window — no rush on your end"); }
     else if (buffer >= 1.5) { score += 1; reasons.push("workable window"); }
@@ -152,31 +138,11 @@ function buildSlots(date) {
   return slots.sort((a, b) => b.score - a.score);
 }
 
-/* ---------- speech ---------- */
-
-function makeRecognizer(onText, onEnd) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return null;
-  const r = new SR();
-  r.continuous = false; r.interimResults = false; r.lang = "en-US";
-  r.onresult = (e) => onText(Array.from(e.results).map((x) => x[0].transcript).join(" "));
-  r.onend = onEnd; r.onerror = onEnd;
-  return r;
-}
-function speak(text) {
-  try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.02;
-    window.speechSynthesis.speak(u);
-  } catch {}
-}
-
 /* ---------- app ---------- */
 
 export default function App() {
   const [tab, setTab] = useState("doors");
-  const [data, setData] = useState({ houses: [] });
+  const [data, setData] = useState({ houses: [], v: 2 });
   const [loaded, setLoaded] = useState(false);
   const [openHouse, setOpenHouse] = useState(null);
 
@@ -193,7 +159,7 @@ export default function App() {
     { id: "texts", label: "Texts", icon: MessageSquare },
     { id: "scripts", label: "Scripts", icon: ClipboardList },
     { id: "train", label: "Train", icon: Mic },
-    { id: "stats", label: "Stats", icon: BarChart3 },
+    { id: "stats", label: "EOD", icon: BarChart3 },
   ];
 
   return (
@@ -210,11 +176,11 @@ export default function App() {
 
       <main className="pb-24 max-w-2xl mx-auto">
         {tab === "map" && <MapTab data={data} update={update} onOpen={setOpenHouse} statuses={STATUSES} />}
-        {tab === "texts" && <TextsTab data={data} />}
+        {tab === "texts" && <TextsTab data={data} update={update} />}
         {tab === "doors" && <Doors data={data} update={update} onOpen={setOpenHouse} />}
         {tab === "book" && <Book data={data} update={update} />}
         {tab === "scripts" && <Scripts />}
-        {tab === "train" && <Train />}
+        {tab === "train" && <TrainTab />}
         {tab === "stats" && <Stats data={data} />}
       </main>
 
@@ -243,10 +209,10 @@ function Doors({ data, update, onOpen }) {
   const add = () => {
     const a = addr.trim();
     if (!a) return;
-    const id = uid();
-    update((d) => d.houses.unshift({ id, address: a, city: "", state: "", zip: "", owner: { first: "", last: "", phone: "", email: "" }, status: "", notes: "", damage: [], knocks: [], appt: null, createdAt: Date.now() }));
+    const h = newHouse({ address: a });
+    update((d) => d.houses.unshift(h));
     setAddr("");
-    onOpen(id);
+    onOpen(h.id);
   };
 
   const voiceAdd = () => {
@@ -256,12 +222,17 @@ function Doors({ data, update, onOpen }) {
     recRef.current = r; setListening(true); r.start();
   };
 
-  const quickLog = (h, statusId) => update((d) => {
-    const x = d.houses.find((y) => y.id === h.id);
-    x.status = statusId;
-    x.knocks.push({ ts: Date.now(), status: statusId });
-  });
+  const quickLog = (h, statusId) => {
+    update((d) => {
+      const x = d.houses.find((y) => y.id === h.id);
+      x.status = statusId;
+      x.knocks.push({ ts: Date.now(), status: statusId });
+    });
+    // Leads need a name/phone for the export — open the sheet right away.
+    if (statusId === "lead") onOpen(h.id);
+  };
 
+  const todayCount = (sid) => data.houses.filter((h) => h.knocks.some((k) => sameDay(k.ts, new Date()) && (sid === "all" || h.status === sid))).length;
   const shown = data.houses.filter((h) => filter === "all" ? true : h.status === filter);
 
   return (
@@ -275,7 +246,7 @@ function Doors({ data, update, onOpen }) {
           </button>
           <button onClick={add} className="knockbtn rounded-xl bg-amber-500 text-white px-4 font-bold"><Plus size={22} /></button>
         </div>
-        <p className="text-xs text-slate-400 mt-2">Tap the mic and say the address while you walk up.</p>
+        <p className="text-xs text-slate-400 mt-2">Tap the mic and say the address while you walk up — or drop pins from the Map tab.</p>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -297,25 +268,26 @@ function Doors({ data, update, onOpen }) {
 
       <div className="space-y-2">
         {shown.map((h) => {
-          const m = statusMeta(h.status || "not_home");
+          const m = h.status ? statusMeta(h.status) : null;
           return (
             <div key={h.id} className="bg-white rounded-2xl shadow-sm p-3">
               <button onClick={() => onOpen(h.id)} className="w-full flex items-center justify-between text-left">
                 <div>
                   <div className="font-semibold text-[15px]">{h.address}</div>
                   <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                    {h.status ? <span className={`px-2 py-0.5 rounded-full ${m.cls}`}>{m.label}</span> : <span className="text-slate-400">Not knocked</span>}
+                    {m ? <span className={`px-2 py-0.5 rounded-full ${m.cls}`}>{m.label}</span> : <span className="text-slate-400">Not knocked</span>}
                     {h.knocks.length > 0 && <span>{h.knocks.length}×</span>}
                     {h.appt && <span className="text-emerald-700 font-medium">📅 {h.appt.label}</span>}
                   </div>
                 </div>
                 <ChevronRight size={18} className="text-slate-300" />
               </button>
-              <div className="grid grid-cols-6 gap-1.5 mt-2">
+              <div className="grid grid-cols-4 gap-1.5 mt-2">
                 {STATUSES.map((s) => (
                   <button key={s.id} onClick={() => quickLog(h, s.id)}
-                    className={`knockbtn rounded-lg py-2 flex justify-center ${h.status === s.id ? s.cls + " ring-2 ring-slate-900/10" : "bg-slate-50 text-slate-400"}`}>
-                    <s.icon size={17} />
+                    className={`knockbtn rounded-xl py-2.5 flex flex-col items-center gap-0.5 ${h.status === s.id ? s.btn + " ring-2 ring-slate-900/10" : "bg-slate-50 text-slate-400"}`}>
+                    <s.icon size={18} />
+                    <span className="text-[10px] font-bold uppercase leading-none">{s.short}</span>
                   </button>
                 ))}
               </div>
@@ -360,6 +332,20 @@ function HouseSheet({ house, update, close }) {
         </div>
 
         <div className="px-4 pb-8 space-y-4">
+          {/* disposition */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {STATUSES.map((s) => (
+              <button key={s.id} onClick={() => set((h) => { h.status = s.id; h.knocks.push({ ts: Date.now(), status: s.id }); })}
+                className={`knockbtn rounded-xl py-3 flex flex-col items-center gap-1 ${house.status === s.id ? s.btn : "bg-white text-slate-400 shadow-sm"}`}>
+                <s.icon size={19} />
+                <span className="text-[10px] font-bold uppercase leading-none">{s.short}</span>
+              </button>
+            ))}
+          </div>
+          {house.status === "lead" && !house.appt && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2 flex gap-2"><AlertTriangle size={14} className="shrink-0 mt-0.5" /> Leads only export to RepCard once an appointment is booked — set one on the Book tab.</p>
+          )}
+
           {/* satellite roof view */}
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <iframe title="roof" className="w-full h-52" loading="lazy"
@@ -412,7 +398,7 @@ function HouseSheet({ house, update, close }) {
             <textarea value={house.notes} onChange={(e) => set((h) => (h.notes = e.target.value))} rows={4}
               placeholder="Who answered, objections, dog, best time, spouse's name, kids' sport in the yard…"
               className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-amber-500" />
-            <p className="text-[11px] text-slate-400">Details win re-knocks. Log the small stuff — it's your opener next time.</p>
+            <p className="text-[11px] text-slate-400">Notes ride along in the RepCard export. Details win re-knocks — log the small stuff.</p>
           </Card>
 
           {/* knock history */}
@@ -420,7 +406,7 @@ function HouseSheet({ house, update, close }) {
             <Card title="History">
               {house.knocks.slice().reverse().map((k, i) => (
                 <div key={i} className="flex justify-between text-xs py-1 border-b border-slate-100 last:border-0">
-                  <span className={`px-2 py-0.5 rounded-full ${statusMeta(k.status).cls}`}>{statusMeta(k.status).label}</span>
+                  <span className={`px-2 py-0.5 rounded-full ${statusMeta(k.status).cls}`}>{statusMeta(k.status).label}{k.auto ? " (auto)" : ""}</span>
                   <span className="text-slate-400">{new Date(k.ts).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                 </div>
               ))}
@@ -490,7 +476,7 @@ function PropertyLookup({ house, set }) {
               ))}
             </div>
           )}
-          {p.ownerOccupied === false && <p className="text-[11px] text-rose-600 font-medium pt-1">Heads up: not owner-occupied. A tenant can't authorize a roof — find the owner or skip.</p>}
+          {p.ownerOccupied === false && <p className="text-[11px] text-rose-600 font-medium pt-1">Heads up: not owner-occupied. A tenant can't authorize a roof — mark it <b>Renting</b> and move on.</p>}
         </div>
       )}
     </div>
@@ -525,17 +511,17 @@ const A = ({ href, children }) => (
 function Book({ data, update }) {
   const day = nextWorkDay(new Date());
   const slots = useMemo(() => buildSlots(day), []);
-  const candidates = data.houses.filter((h) => ["talked", "callback", "appt"].includes(h.status));
+  const candidates = data.houses.filter((h) => h.status === "lead");
   const [sel, setSel] = useState(candidates[0]?.id || "");
 
   const book = (slot) => {
-    if (!sel) { alert("Pick a house first (log it as Talked or Callback on the Doors tab)."); return; }
+    if (!sel) { alert("Pick a house first (log it as a Lead on the Doors tab)."); return; }
     const label = `${DAY_NAMES[day.getDay()].slice(0, 3)} ${day.getMonth() + 1}/${day.getDate()} · ${slot.label}`;
+    // Booking attaches the appointment — it isn't a knock, so don't log one.
     update((d) => {
       const h = d.houses.find((x) => x.id === sel);
       h.appt = { dateISO: day.toISOString(), time: slot.label, label };
-      h.status = "appt";
-      h.knocks.push({ ts: Date.now(), status: "appt" });
+      h.status = "lead";
     });
   };
 
@@ -543,16 +529,16 @@ function Book({ data, update }) {
     <div className="p-4 space-y-4">
       <div className="bg-slate-900 text-white rounded-2xl p-4">
         <div className="disp text-lg font-extrabold uppercase">Next-day booking</div>
-        <p className="text-sm text-slate-300 mt-1">Knocking today → booking <b className="text-amber-400">{DAY_NAMES[day.getDay()]} {day.getMonth() + 1}/{day.getDate()}</b>. Slots are ranked so the homeowner has a real open window — never squeezed into their last hour or yours.</p>
+        <p className="text-sm text-slate-300 mt-1">Knocking today → booking <b className="text-amber-400">{DAY_NAMES[day.getDay()]} {day.getMonth() + 1}/{day.getDate()}</b>. A lead only counts (and only exports to RepCard) once it has a time on the calendar.</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm p-3">
         <div className="disp font-bold uppercase text-sm text-slate-500 mb-2">Booking for</div>
         {candidates.length === 0 ? (
-          <p className="text-sm text-slate-400">No candidates yet — mark a door as <b>Talked</b> or <b>Callback</b> first.</p>
+          <p className="text-sm text-slate-400">No leads yet — mark a door as <b>Lead</b> first.</p>
         ) : (
           <select value={sel} onChange={(e) => setSel(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm bg-white">
-            {candidates.map((h) => <option key={h.id} value={h.id}>{h.address}{h.appt ? ` — booked ${h.appt.label}` : ""}</option>)}
+            {candidates.map((h) => <option key={h.id} value={h.id}>{h.address}{h.appt ? ` — booked ${h.appt.label}` : " — NO APPT YET"}</option>)}
           </select>
         )}
       </div>
@@ -584,7 +570,7 @@ function Scripts() {
   const [open, setOpen] = useState(0);
   return (
     <div className="p-4 space-y-2">
-      <p className="text-xs text-slate-500 px-1 pb-1">Tap a script. The <b>why it works</b> line under each one is the part to internalize — say it your way, not word-for-word.</p>
+      <p className="text-xs text-slate-500 px-1 pb-1">Tap a script. The <b>why it works</b> line under each one is the part to internalize — say it your way, not word-for-word. Drill any of these live on the Train tab.</p>
       {SCRIPTS.map((s, i) => (
         <div key={i} className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <button onClick={() => setOpen(open === i ? -1 : i)} className="w-full p-3 text-left flex items-center justify-between">
@@ -606,123 +592,25 @@ function Scripts() {
   );
 }
 
-/* ---------- train ---------- */
-
-function Train() {
-  const [persona, setPersona] = useState(null);
-  const [difficulty, setDifficulty] = useState("medium");
-  const [msgs, setMsgs] = useState([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [tts, setTts] = useState(true);
-  const [listening, setListening] = useState(false);
-  const [feedback, setFeedback] = useState("");
-  const recRef = useRef(null);
-  const endRef = useRef(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, feedback]);
-
-  const sys = persona && `You are roleplaying a homeowner in a door-to-door sales training simulator for a roofing/storm-damage appointment setter. You just opened your front door to the trainee.
-Persona: ${persona.label} — ${persona.desc}. Difficulty: ${difficulty}.
-Rules: Stay fully in character as the homeowner. Reply in 1–3 short spoken sentences, natural and realistic — interruptions, hesitation, real objections. On easy, warm up if the rep is decent. On medium, need 2–3 good moves before softening. On hard, be tough: stack objections, threaten to close the door, only agree if the rep is genuinely excellent. If the rep earns it, agree to a specific appointment time. If the rep is pushy or robotic, get colder. Never break character, never give coaching, never mention being an AI.`;
-
-  const start = (p) => { setPersona(p); setMsgs([]); setFeedback(""); };
-
-  const send = async (text) => {
-    const t = (text ?? input).trim();
-    if (!t || busy) return;
-    setInput("");
-    const next = [...msgs, { role: "user", content: t }];
-    setMsgs(next); setBusy(true);
-    try {
-      const reply = await askClaude(next, sys);
-      setMsgs([...next, { role: "assistant", content: reply }]);
-      if (tts) speak(reply);
-    } catch { setMsgs([...next, { role: "assistant", content: "(connection hiccup — say that again)" }]); }
-    setBusy(false);
-  };
-
-  const listen = () => {
-    if (listening) { recRef.current?.stop(); return; }
-    const r = makeRecognizer((t) => send(t), () => setListening(false));
-    if (!r) { alert("Voice input isn't supported in this browser — type instead."); return; }
-    recRef.current = r; setListening(true); r.start();
-  };
-
-  const grade = async () => {
-    if (msgs.length < 2 || busy) return;
-    setBusy(true);
-    try {
-      const transcript = msgs.map((m) => `${m.role === "user" ? "REP" : "HOMEOWNER"}: ${m.content}`).join("\n");
-      const fb = await askClaude(
-        [{ role: "user", content: `Score this door-knocking roleplay for the REP (an appointment setter). Transcript:\n${transcript}\n\nGive: 1) Score /10. 2) Best moment. 3) Biggest miss. 4) One line to say differently next time (write the exact line). 5) Did they control the close with an either/or time and confirm both homeowners? Keep it under 150 words, direct, coach-style.` }],
-        "You are an elite door-to-door sales coach. Be direct, specific, and practical.");
-      setFeedback(fb);
-    } catch { setFeedback("Couldn't reach the coach — try again."); }
-    setBusy(false);
-  };
-
-  if (!persona) return (
-    <div className="p-4 space-y-3">
-      <div className="bg-slate-900 text-white rounded-2xl p-4">
-        <div className="disp text-lg font-extrabold uppercase flex items-center gap-2"><Mic size={18} className="text-amber-400" /> Live door simulator</div>
-        <p className="text-sm text-slate-300 mt-1">Pick who answers the door. Talk with the mic like a real knock, or type. End the session for a coach's scorecard.</p>
-      </div>
-      <div className="flex gap-2">
-        {["easy", "medium", "hard"].map((d) => (
-          <button key={d} onClick={() => setDifficulty(d)} className={`flex-1 py-2 rounded-xl disp font-bold uppercase text-sm ${difficulty === d ? "bg-amber-500 text-white" : "bg-white text-slate-500"}`}>{d}</button>
-        ))}
-      </div>
-      {PERSONAS.map((p) => (
-        <button key={p.id} onClick={() => start(p)} className="knockbtn w-full bg-white rounded-2xl shadow-sm p-4 text-left flex items-center justify-between">
-          <div>
-            <div className="font-semibold">{p.label}</div>
-            <div className="text-xs text-slate-500">{p.desc}</div>
-          </div>
-          <DoorOpen size={20} className="text-amber-500" />
-        </button>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 130px)" }}>
-      <div className="px-4 py-2 flex items-center justify-between bg-white border-b border-slate-200">
-        <button onClick={() => setPersona(null)} className="text-xs text-slate-500">← Personas</button>
-        <div className="disp font-bold uppercase text-sm">{persona.label} · {difficulty}</div>
-        <div className="flex gap-2">
-          <button onClick={() => setTts(!tts)} className="text-slate-500">{tts ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
-          <button onClick={grade} className="text-xs bg-slate-900 text-white rounded-full px-3 py-1 font-bold">Score me</button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {msgs.length === 0 && <p className="text-center text-slate-400 text-sm mt-10">🚪 <i>The door opens…</i> Make your opener.</p>}
-        {msgs.map((m, i) => (
-          <div key={i} className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === "user" ? "ml-auto bg-amber-500 text-white" : "bg-white shadow-sm"}`}>{m.content}</div>
-        ))}
-        {busy && <div className="bg-white shadow-sm rounded-2xl px-3 py-2 text-sm w-16 text-slate-400">…</div>}
-        {feedback && <div className="bg-slate-900 text-slate-100 rounded-2xl p-3 text-sm whitespace-pre-wrap"><div className="disp font-bold uppercase text-amber-400 mb-1 flex items-center gap-1"><Sparkles size={14} /> Coach's card</div>{feedback}</div>}
-        <div ref={endRef} />
-      </div>
-      <div className="p-3 bg-white border-t border-slate-200 flex gap-2">
-        <button onClick={listen} className={`knockbtn rounded-xl px-4 ${listening ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-600"}`}>{listening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Speak or type your line…"
-          className="flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-amber-500" />
-        <button onClick={() => send()} className="knockbtn rounded-xl bg-amber-500 text-white px-4"><Send size={18} /></button>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- stats + export ---------- */
+/* ---------- stats + end-of-day export ---------- */
 
 function Stats({ data }) {
   const [insight, setInsight] = useState("");
   const [busy, setBusy] = useState(false);
+  const [quickFill, setQuickFill] = useState(null); // index into rows, or null
+  const [exportMsg, setExportMsg] = useState("");
+  const [allTime, setAllTime] = useState(false);
+
+  const today = new Date();
+  const { rows, leadsMissingAppt } = useMemo(() => buildExport(data.houses, allTime ? null : today), [data, allTime]);
+  const counts = {};
+  for (const r of rows) counts[r.status] = (counts[r.status] || 0) + 1;
 
   const knocks = data.houses.flatMap((h) => h.knocks);
+  const todayKnocks = knocks.filter((k) => sameDay(k.ts, today));
   const total = knocks.length;
   const contacts = knocks.filter((k) => k.status !== "not_home").length;
-  const appts = data.houses.filter((h) => h.status === "appt").length;
+  const appts = data.houses.filter((h) => h.appt).length;
   const byHour = {};
   knocks.forEach((k) => {
     const h = new Date(k.ts).getHours();
@@ -734,6 +622,13 @@ function Stats({ data }) {
     .map(([h, v]) => ({ h, rate: v.contact / v.total, n: v.total }))
     .sort((a, b) => b.rate - a.rate).slice(0, 3);
 
+  const doExport = async () => {
+    if (rows.length === 0) { setExportMsg("Nothing to export — no dispositioned knocks " + (allTime ? "yet." : "today.")); return; }
+    const name = `repcard-${allTime ? "all" : today.toISOString().slice(0, 10)}.csv`;
+    const result = await shareOrDownloadCSV(toCSV(rows), name);
+    if (result !== "cancelled") setExportMsg(result === "shared" ? "Sent to your share sheet." : `Downloaded ${name}. In RepCard: Contacts → Import → map the columns once.`);
+  };
+
   const analyze = async () => {
     setBusy(true);
     try {
@@ -742,31 +637,46 @@ function Stats({ data }) {
         knockTimes: h.knocks.map((k) => new Date(k.ts).toLocaleString([], { weekday: "short", hour: "numeric" })),
         notes: (h.notes || "").slice(0, 120),
       }));
-      const out = await askClaude([{ role: "user", content: `I'm a door-to-door roofing appointment setter. Here's my knock log as JSON:\n${JSON.stringify(summary)}\nStats: ${total} knocks, ${contacts} contacts, ${appts} appointments.\nFind patterns: best times/streets, what my notes suggest about objections I keep hitting, which not-homes and callbacks to re-hit first tomorrow and at what hour, and one habit to change. Under 200 words, bullet-style, blunt and practical.` }],
+      const out = await askClaude([{ role: "user", content: `I'm a door-to-door roofing appointment setter. Here's my knock log as JSON:\n${JSON.stringify(summary)}\nStats: ${total} knocks, ${contacts} contacts, ${appts} appointments. My dispositions are: not_home, not_int (not interested), renting, lead.\nFind patterns: best times/streets, what my notes suggest about objections I keep hitting, which not-homes to re-hit first tomorrow and at what hour, and one habit to change. Under 200 words, bullet-style, blunt and practical.` }],
         "You are a door-to-door sales analyst. Be specific and practical, not generic.");
       setInsight(out);
     } catch { setInsight("Couldn't run the analysis — try again."); }
     setBusy(false);
   };
 
-  const exportCSV = () => {
-    const rows = data.houses.filter((h) => h.status && h.status !== "not_home");
-    if (rows.length === 0) { alert("Nothing to export yet."); return; }
-    const esc = (v) => `"${String(v || "").replace(/"/g, '""')}"`;
-    const csv = ["First Name,Last Name,Phone,Email,Street Address,City,State,Zip,Status,Appointment,Notes",
-      ...rows.map((h) => [h.owner.first, h.owner.last, h.owner.phone, h.owner.email, h.address, h.city, h.state, h.zip,
-        statusMeta(h.status).label, h.appt?.label || "", h.notes].map(esc).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `repcard-import-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-  };
-
   return (
     <div className="p-4 space-y-4">
+      {/* ---- end of day export ---- */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="disp text-lg font-extrabold uppercase">End of day → RepCard</div>
+          <button onClick={() => setAllTime(!allTime)} className="text-[11px] font-bold uppercase bg-white/10 rounded-full px-3 py-1">{allTime ? "All time" : "Today"}</button>
+        </div>
+        <div className="grid grid-cols-4 gap-2 text-center">
+          {STATUSES.map((s) => (
+            <div key={s.id} className="bg-white/10 rounded-xl py-2">
+              <div className="disp text-xl font-extrabold">{counts[s.id] || 0}</div>
+              <div className="text-[10px] uppercase font-bold text-slate-300">{s.short}</div>
+            </div>
+          ))}
+        </div>
+        {leadsMissingAppt.length > 0 && (
+          <p className="text-xs text-amber-300 flex gap-2"><AlertTriangle size={14} className="shrink-0 mt-0.5" /> {leadsMissingAppt.length} lead{leadsMissingAppt.length > 1 ? "s" : ""} without an appointment ({leadsMissingAppt.map((h) => h.address).join("; ")}) — book them or they won't export.</p>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={doExport} className="knockbtn bg-amber-500 text-slate-900 rounded-xl py-3 disp font-extrabold uppercase text-sm flex items-center justify-center gap-1.5">
+            <Share2 size={16} /> Export CSV
+          </button>
+          <button onClick={() => rows.length ? setQuickFill(0) : setExportMsg("Nothing to quick-fill yet.")} className="knockbtn bg-white text-slate-900 rounded-xl py-3 disp font-extrabold uppercase text-sm flex items-center justify-center gap-1.5">
+            <ClipboardCopy size={16} /> Quick Fill
+          </button>
+        </div>
+        {exportMsg && <p className="text-xs text-slate-300">{exportMsg}</p>}
+        <p className="text-[11px] text-slate-400">Exports {allTime ? "every" : "today's"} Not home / Not interested / Renting knock — and Leads only once they have an appointment. Quick Fill gives you tap-to-copy fields for punching doors into the RepCard app one at a time.</p>
+      </div>
+
       <div className="grid grid-cols-3 gap-2">
-        <Stat n={total} l="Knocks" />
+        <Stat n={todayKnocks.length} l="Knocks today" />
         <Stat n={total ? Math.round((contacts / total) * 100) + "%" : "—"} l="Contact rate" />
         <Stat n={appts} l="Appts" />
       </div>
@@ -790,10 +700,7 @@ function Stats({ data }) {
 
       <ManagerReport data={data} />
 
-      <button onClick={exportCSV} className="knockbtn w-full bg-amber-500 text-white rounded-2xl p-4 flex items-center justify-center gap-2 disp font-extrabold uppercase">
-        <Download size={18} /> Export CSV for RepCard
-      </button>
-      <p className="text-[11px] text-slate-400 text-center px-4">Exports every contacted door (name, phone, address, status, appointment, notes). In RepCard: Contacts → Import → upload this file and map the columns once.</p>
+      {quickFill !== null && <QuickFill rows={rows} startIndex={quickFill} close={() => setQuickFill(null)} />}
     </div>
   );
 }
@@ -804,25 +711,22 @@ function ManagerReport({ data }) {
 
   const gen = async () => {
     setBusy(true);
-    const knocks = data.houses.flatMap((h) => h.knocks);
-    const appts = data.houses.filter((h) => h.status === "appt");
+    const today = new Date();
+    const todayHouses = data.houses.filter((h) => h.knocks.some((k) => sameDay(k.ts, today)));
+    const knocks = todayHouses.flatMap((h) => h.knocks.filter((k) => sameDay(k.ts, today)));
+    const appts = data.houses.filter((h) => h.appt);
     const stats = {
-      knocks: knocks.length,
+      doorsKnockedToday: todayHouses.length,
+      knocksToday: knocks.length,
       contacts: knocks.filter((k) => k.status !== "not_home").length,
-      appointments: appts.length,
-      apptList: appts.map((h) => ({ address: h.address, when: h.appt?.label, owner: [h.owner.first, h.owner.last].filter(Boolean).join(" ") })),
-      callbacks: data.houses.filter((h) => h.status === "callback").length,
+      byStatus: { notHome: todayHouses.filter((h) => h.status === "not_home").length, notInterested: todayHouses.filter((h) => h.status === "not_int").length, renting: todayHouses.filter((h) => h.status === "renting").length, leads: todayHouses.filter((h) => h.status === "lead").length },
+      appointments: appts.map((h) => ({ address: h.address, when: h.appt?.label, owner: [h.owner.first, h.owner.last].filter(Boolean).join(" ") })),
     };
     try {
-      const res = await fetch("/api/claude", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system: "You write concise, professional daily field reports from a door-to-door setter to their sales manager. Clean, confident, no fluff.",
-          messages: [{ role: "user", content: `Write my end-of-day report to my manager from this data: ${JSON.stringify(stats)}. Include: doors knocked, contact rate, appointments set (with addresses and times), callbacks to note, and a one-line plan for tomorrow. Keep it tight and professional.` }],
-        }),
-      });
-      const j = await res.json();
-      setReport((j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n"));
+      const out = await askClaude(
+        [{ role: "user", content: `Write my end-of-day report to my manager from this data: ${JSON.stringify(stats)}. Include: doors knocked, contact rate, dispositions breakdown, appointments set (with addresses and times), and a one-line plan for tomorrow. Keep it tight and professional.` }],
+        "You write concise, professional daily field reports from a door-to-door setter to their sales manager. Clean, confident, no fluff.");
+      setReport(out);
     } catch { setReport("Couldn't generate — try again."); }
     setBusy(false);
   };
