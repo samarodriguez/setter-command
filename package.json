@@ -1,24 +1,9 @@
 {
-  "name": "setter-command",
+  "name": "tidal-field-kit",
   "version": "1.0.0",
   "private": true,
+  "description": "Door-knocking field kit for Tidal Remodeling: shift tool with GPS auto-door logging, lead CRM, and a homeowner request form that calls the office.",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
-    "leaflet": "^1.9.4",
-    "lucide-react": "^0.469.0",
-    "next": "14.2.35",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-leaflet": "^4.2.1"
-  },
-  "devDependencies": {
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17"
+    "dev": "npx --yes serve . -l 3000"
   }
 }

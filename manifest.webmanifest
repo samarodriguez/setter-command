@@ -1,0 +1,20 @@
+{
+  "name": "Tidal Field Kit",
+  "short_name": "Tidal",
+  "description": "Door-knocking shift tool, lead CRM and homeowner request form for Tidal Remodeling.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fcfcfb",
+  "theme_color": "#0b0b0b",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Start a shift", "url": "/shift" },
+    { "name": "Lead CRM", "url": "/crm" }
+  ]
+}

@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fcfcfb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Tidal Lead CRM</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+
+<style>
+  :root{
+    --surface:#fcfcfb; --plane:#f4f3f0; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --line:#c3c2b7; --accent:#2a78d6; --accent-soft:#cde2fb;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%}
+  body{background:var(--plane);color:var(--ink);
+       font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+  .app{max-width:600px;margin:0 auto;min-height:100%;background:var(--surface);
+       display:flex;flex-direction:column}
+
+  header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--grid)}
+  .bar{display:flex;align-items:center;gap:10px;padding:12px 14px}
+  .bar h1{font-size:17px;margin:0;letter-spacing:-.01em;flex:1}
+  .sync{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .sync i{width:8px;height:8px;border-radius:99px;background:var(--muted);display:block;flex:none}
+  .sync.ok i{background:var(--good)} .sync.bad i{background:var(--crit)}
+  .sync.busy i{background:var(--warn);animation:pp 1s infinite}
+  @keyframes pp{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;
+       padding:9px 13px;font:600 14px system-ui,sans-serif;cursor:pointer}
+  .btn:active{background:var(--plane)}
+  .btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px}
+  .btn.go{background:var(--good);border-color:var(--good);color:#fff}
+  .btn:disabled{opacity:.45}
+
+  main{flex:1;padding:14px 14px calc(92px + var(--safe-b))}
+  .pane{display:none} .pane.on{display:block}
+  h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+     margin:20px 0 9px;font-weight:700}
+  h2:first-child{margin-top:0}
+
+  .banner{border-radius:11px;padding:12px 14px;font-size:13.5px;line-height:1.5;margin-bottom:12px}
+  .banner.warn{background:#fdf4e3;border-left:4px solid var(--warn)}
+  .banner.bad{background:#fbeceb;border-left:4px solid var(--crit)}
+  .banner b{display:block;margin-bottom:3px}
+
+  /* ---- lead cards ---- */
+  .lead{border:1px solid var(--grid);border-radius:13px;padding:13px;margin-bottom:9px;background:var(--surface)}
+  .lead.due{border-left:4px solid var(--warn)}
+  .lead.hot{border-left:4px solid var(--crit)}
+  .lead.appt{border-left:4px solid var(--good)}
+  .lhead{display:flex;align-items:flex-start;gap:9px}
+  .lname{font-size:16px;font-weight:700;flex:1;line-height:1.25}
+  .laddr{font-size:13px;color:var(--ink-2);margin-top:2px}
+  .why{font-size:13px;font-weight:600;margin:9px 0 0;color:var(--ink)}
+  .why.urgent{color:#a52a2a}
+  .lmeta{font-size:12px;color:var(--muted);margin-top:5px}
+  .acts{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+  .acts a,.acts button{flex:1;min-width:66px;text-align:center;text-decoration:none;
+       border:1px solid var(--line);border-radius:9px;padding:10px 6px;
+       font:600 13px system-ui,sans-serif;color:var(--ink);background:var(--surface);cursor:pointer}
+  .acts .p{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;
+        letter-spacing:.05em;padding:3px 8px;border-radius:99px;background:var(--plane);
+        color:var(--ink-2);flex:none}
+  .pill.hot{background:#fbeceb;color:#a52a2a}
+  .pill.cold{background:var(--plane);color:var(--muted)}
+  .pill.s-new{background:#e8f1fd;color:#1c5cab}
+  .pill.s-contacted{background:#e8f1fd;color:#1c5cab}
+  .pill.s-appt_set{background:#e6f5e6;color:#06630a}
+  .pill.s-sat{background:#e6f5e6;color:#06630a}
+  .pill.s-sold{background:#0ca30c;color:#fff}
+  .pill.s-dead{background:var(--plane);color:var(--muted)}
+
+  /* ---- filters ---- */
+  .filters{border:1px solid var(--grid);border-radius:12px;padding:11px;margin-bottom:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 11px;
+        font:600 12.5px system-ui,sans-serif;color:var(--ink-2);cursor:pointer}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;
+       font:16px system-ui,sans-serif;color:var(--ink);background:var(--surface)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  textarea{min-height:74px;resize:vertical;font-family:system-ui,sans-serif}
+  label{display:block;font-size:12px;font-weight:700;letter-spacing:.02em;margin:13px 0 5px}
+  label .opt{font-weight:500;color:var(--muted)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+  /* ---- pipeline ---- */
+  .pipe{display:flex;height:34px;border-radius:9px;overflow:hidden;gap:2px;background:var(--grid)}
+  .pipe div{display:flex;align-items:center;justify-content:center;color:#fff;
+            font:700 12px system-ui,sans-serif;min-width:0}
+  .plegend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-2)}
+  .plegend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+  .tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:14px}
+  .tile{border:1px solid var(--grid);border-radius:12px;padding:11px 10px}
+  .tile .v{font-size:25px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+  .tile .l{font-size:11px;color:var(--muted);margin-top:3px}
+
+  /* ---- detail sheet ---- */
+  .scrim{position:fixed;inset:0;background:rgba(11,11,11,.45);z-index:50;display:none}
+  .scrim.on{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--surface);
+         border-radius:18px 18px 0 0;max-height:92vh;overflow:auto;transform:translateY(100%);
+         transition:transform .26s cubic-bezier(.3,1,.5,1);
+         padding:8px 16px calc(24px + var(--safe-b));max-width:600px;margin:0 auto}
+  .sheet.on{transform:translateY(0)}
+  .grab{width:38px;height:4px;border-radius:99px;background:var(--line);margin:8px auto 12px}
+  .tl{border-left:2px solid var(--grid);padding-left:13px;margin-left:4px}
+  .tl div{font-size:13px;color:var(--ink-2);padding:6px 0;position:relative}
+  .tl div::before{content:'';position:absolute;left:-19px;top:12px;width:7px;height:7px;
+                  border-radius:99px;background:var(--line)}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(150%);
+    bottom:calc(86px + var(--safe-b));width:min(560px,calc(100% - 26px));z-index:60;
+    background:var(--ink);color:#fff;border-radius:12px;padding:13px 15px;font:600 14.5px system-ui;
+    transition:transform .26s cubic-bezier(.3,1.2,.5,1);box-shadow:0 8px 28px rgba(0,0,0,.25)}
+  .toast.on{transform:translateX(-50%) translateY(0)}
+
+  nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--surface);
+      border-top:1px solid var(--grid);padding-bottom:var(--safe-b)}
+  .tabs{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+  .tab{border:0;background:none;padding:9px 3px 10px;cursor:pointer;display:flex;flex-direction:column;
+       align-items:center;gap:3px;color:var(--muted);font:inherit;position:relative}
+  .tab .ic{font-size:18px;line-height:1}
+  .tab .tt{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .tab.on{color:var(--accent)}
+  .tab .badge{position:absolute;top:4px;right:calc(50% - 22px);background:var(--crit);color:#fff;
+              font:700 10px system-ui;border-radius:99px;padding:1px 5px;min-width:16px}
+  .muted{color:var(--muted);font-size:13px}
+  .hint{font-size:12.5px;color:var(--muted);margin:7px 0 0;line-height:1.5}
+  .empty{text-align:center;color:var(--muted);padding:34px 12px;font-size:14px;line-height:1.6}
+  code{background:var(--plane);padding:2px 5px;border-radius:5px;font-size:12.5px;
+       word-break:break-all;font-family:ui-monospace,Menlo,monospace}
+  hr{border:0;border-top:1px solid var(--grid);margin:18px 0}
+  .card{border:1px solid var(--grid);border-radius:12px;padding:14px;margin-bottom:10px}
+  .card p{margin:0 0 9px;font-size:14px;color:var(--ink-2);line-height:1.55}
+  .card p:last-child{margin-bottom:0}
+  .card b{color:var(--ink)}
+  ol.steps{margin:0;padding-left:20px} ol.steps li{font-size:14px;margin-bottom:9px;line-height:1.55;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="bar">
+    <h1>Lead CRM</h1>
+    <div class="sync" id="sync"><i></i><span id="syncTxt">not connected</span></div>
+    <button class="btn sm" id="syncBtn">Sync</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════════ NOW ══════════════ -->
+<section class="pane on" id="p-now">
+  <div class="banner warn" id="setupWarn" style="display:none">
+    <b>Not connected to your sheet yet</b>
+    Anything you add right now lives only in this tab and disappears when you close it.
+    Open <b>SETUP</b> and connect a Google Sheet first — about ten minutes, once, and it's free.
+  </div>
+  <div class="tiles">
+    <div class="tile"><div class="v" id="kDue">0</div><div class="l">Need a touch</div></div>
+    <div class="tile"><div class="v" id="kAppt">0</div><div class="l">Appts booked</div></div>
+    <div class="tile"><div class="v" id="kNew">0</div><div class="l">New today</div></div>
+  </div>
+  <h2>Work these, in this order</h2>
+  <div id="nowList"></div>
+</section>
+
+<!-- ══════════════ LEADS ══════════════ -->
+<section class="pane" id="p-leads">
+  <h2>Pipeline</h2>
+  <div class="pipe" id="pipe"></div>
+  <div class="plegend" id="pipeLegend"></div>
+
+  <div class="filters" style="margin-top:14px">
+    <input id="q" placeholder="Search name, street, phone, notes…">
+    <div class="chips" id="stageChips"></div>
+    <div class="chips" id="tempChips"></div>
+    <div class="chips" id="sourceChips"></div>
+    <div class="chips">
+      <button class="chip" data-special="due">Needs attention</button>
+      <button class="chip" data-special="appt">Has appointment</button>
+      <button class="chip" data-special="clear">Clear all</button>
+    </div>
+    <label style="margin-top:12px">Sort by</label>
+    <select id="sortBy">
+      <option value="priority">Priority — who to work now</option>
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="appt">Appointment date</option>
+      <option value="name">Name</option>
+      <option value="stale">Longest since contact</option>
+    </select>
+  </div>
+  <h2 id="leadsCount">All leads</h2>
+  <div id="leadList"></div>
+</section>
+
+<!-- ══════════════ APPOINTMENTS ══════════════ -->
+<section class="pane" id="p-appts">
+  <div class="tiles">
+    <div class="tile"><div class="v" id="aConfirm">0</div><div class="l">Need confirming</div></div>
+    <div class="tile"><div class="v" id="aUpcoming">0</div><div class="l">Upcoming</div></div>
+    <div class="tile"><div class="v" id="aOutcome">0</div><div class="l">Log outcome</div></div>
+  </div>
+  <div class="banner warn" style="font-size:13px">
+    <b>Confirm every appointment twice</b>
+    A yes that came easily carries real no-show risk — people agree to end a conversation.
+    Text within two hours of booking, then again the day before. A booked appointment that
+    no-shows counts for nothing.
+  </div>
+  <h2>Needs confirming</h2>
+  <div id="apptConfirm"></div>
+  <h2>Upcoming</h2>
+  <div id="apptUpcoming"></div>
+  <h2>Waiting on an outcome</h2>
+  <div id="apptPast"></div>
+</section>
+
+<!-- ══════════════ ADD ══════════════ -->
+<section class="pane" id="p-add">
+  <h2>New lead</h2>
+  <label for="aName">Name</label>
+  <input id="aName" autocomplete="off" placeholder="First and last">
+  <div class="two">
+    <div><label for="aPhone">Phone</label><input id="aPhone" type="tel" inputmode="tel" placeholder="(760) 555-0123"></div>
+    <div><label for="aCity">City</label><input id="aCity" placeholder="Carlsbad"></div>
+  </div>
+  <label for="aAddr">Address</label>
+  <input id="aAddr" placeholder="1420 Chestnut Ave">
+  <label for="aEmail">Email <span class="opt">— optional</span></label>
+  <input id="aEmail" type="email" inputmode="email">
+  <div class="two">
+    <div><label for="aTemp">Temperature</label>
+      <select id="aTemp"><option value="hot">Hot</option><option value="warm" selected>Warm</option><option value="cold">Cold</option></select></div>
+    <div><label for="aStage">Stage</label>
+      <select id="aStage"><option value="new">New</option><option value="contacted" selected>Contacted at door</option><option value="appt_set">Appointment set</option></select></div>
+  </div>
+  <label for="aRoof">Roof type</label>
+  <select id="aRoof">
+    <option value="">Not sure</option>
+    <option>Concrete tile</option><option>Clay tile</option>
+    <option>Architectural asphalt</option><option>3-tab asphalt</option>
+    <option>Wood shake</option><option>Flat / low slope</option>
+  </select>
+  <label for="aDamage">What you saw from the street</label>
+  <input id="aDamage" placeholder="Cracked ridge caps, one slipped tile over the garage">
+  <label for="aAppt">Appointment <span class="opt">— if you booked one</span></label>
+  <input id="aAppt" type="datetime-local">
+  <label for="aNotes">Notes</label>
+  <textarea id="aNotes" placeholder="Owned 12 years. Wife decides. Said call after 4."></textarea>
+  <button class="btn pri" id="addBtn" style="width:100%;min-height:54px;margin-top:18px">Save lead</button>
+  <p class="hint">Add it while you're still walking to the next house. A lead you meant to write down later is a lead you lose.</p>
+</section>
+
+<!-- ══════════════ SETUP ══════════════ -->
+<section class="pane" id="p-setup">
+  <div class="banner bad">
+    <b>Check with your manager first</b>
+    Leads are usually company property, and Tidal requires RepCard. Treat RepCard as the
+    system of record and this as your personal working layer on top of it — or ask whether
+    they'd rather you use their pipeline. Don't build a private customer database without asking.
+  </div>
+
+  <h2>Connect</h2>
+  <label for="cfgKey">CRM passcode</label>
+  <input id="cfgKey" type="password" autocomplete="off" placeholder="the CRM_PASSCODE you set in Vercel">
+  <label for="cfgRep">Your name</label>
+  <input id="cfgRep" placeholder="Sam">
+  <div class="two" style="margin-top:16px">
+    <button class="btn pri" id="cfgSave" style="min-height:50px">Connect &amp; test</button>
+    <button class="btn" id="cfgLink" style="min-height:50px">Get my link</button>
+  </div>
+  <p class="hint">Settings ride in this page's link rather than in browser storage, so once it works,
+  hit <b>Get my link</b> and <b>Add to Home Screen</b>. It opens connected every time.
+  Treat that link like a password — anyone who has it can read your leads.</p>
+
+  <h2>How to set it up</h2>
+  <div class="card">
+    <p>The sheet credentials live on the server, not in this page, so nobody can read your
+    customer list by viewing source. Three environment variables do it.</p>
+    <ol class="steps">
+      <li>Go to <b>sheets.new</b> and name it "Tidal Leads".</li>
+      <li><b>Extensions &rarr; Apps Script.</b> Delete what's there and paste in <code>docs/tidal-crm-backend.gs</code> from the project.</li>
+      <li>Change <code>TOKEN</code> to any random string and put your email in <code>NOTIFY_EMAIL</code>.</li>
+      <li>Save, then <b>Deploy &rarr; New deployment &rarr; Web app.</b> Execute as <b>Me</b>, access <b>Anyone</b>. Copy the URL.</li>
+      <li>In <b>Vercel &rarr; Settings &rarr; Environment Variables</b> add three:
+        <br><code>SHEETS_WEBAPP_URL</code> = that URL
+        <br><code>SHEETS_TOKEN</code> = the same TOKEN
+        <br><code>CRM_PASSCODE</code> = a passcode you invent, for this page</li>
+      <li><b>Redeploy</b> (env vars only take effect on a new deployment), then enter the passcode above.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <p><b>What this gets you.</b> Every request from the homeowner form lands in your sheet and
+    emails you straight away. During office hours the subject says <b>call now</b>; after hours it
+    says which morning to call, and an optional 9am trigger sends a digest of anything still waiting.</p>
+    <p><b>Where your data lives.</b> In your own Google Sheet. Not with me, not on Vercel beyond
+    passing through. This page holds nothing once it's closed.</p>
+    <p><b>Why there's a passcode.</b> Anyone can submit the homeowner form — that's the point of it.
+    But the lead list has names, phone numbers and home addresses in it, so reading requires the
+    passcode. Without <code>CRM_PASSCODE</code> set, reading is switched off entirely.</p>
+  </div>
+
+  <details style="border:1px solid var(--grid);border-radius:12px;margin-bottom:10px">
+    <summary style="padding:14px;font-weight:650;cursor:pointer">Running this without a server?</summary>
+    <div style="padding:0 14px 14px">
+      <p class="hint" style="margin-top:0">If you ever open these files straight off a laptop instead
+      of the deployed site, there's no <code>/api/leads</code> to talk to. Fill these two in and the page
+      talks to Apps Script directly — less safe, because the token is then in the page, so only do it
+      on your own device.</p>
+      <label for="cfgUrl">Apps Script web app URL</label>
+      <input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec">
+      <label for="cfgTok">Script token</label>
+      <input id="cfgTok" type="password" autocomplete="off" placeholder="the TOKEN inside the script">
+    </div>
+  </details>
+
+  <h2>Follow-up cadence in use</h2>
+  <div class="card">
+    <p>The <b>NOW</b> list is driven by this, counted from your last touch: <b>2 hours → day 1 → day 3 → day 7 → day 14 → day 30 → day 90.</b> Every time you log a touch the clock resets to the next step out.</p>
+    <p>It's RepCard's published cadence, and the reasoning behind the front end of it is sound: response speed is the highest-leverage follow-up variable there is. The specific "7× more likely" figure that gets quoted comes from a study of inbound B2B web leads, not knocked doors — directionally right, don't treat the number as yours.</p>
+    <p><b>The one metric worth watching:</b> what share of new leads you touch within 24 hours. Aim for 60–80%.</p>
+  </div>
+
+  <hr>
+  <button class="btn" id="exportBtn" style="width:100%;min-height:48px">Download all leads as CSV</button>
+  <p class="hint" style="text-align:center">A backup you own, in case you ever lose access to the sheet.</p>
+</section>
+
+</main>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="detail"><div class="grab"></div><div id="detailBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<nav><div class="tabs">
+  <button class="tab on" data-p="now"><span class="ic">🎯</span><span class="tt">Now</span><span class="badge" id="badgeNow" style="display:none">0</span></button>
+  <button class="tab" data-p="leads"><span class="ic">📇</span><span class="tt">Leads</span></button>
+  <button class="tab" data-p="appts"><span class="ic">📅</span><span class="tt">Appts</span><span class="badge" id="badgeAppt" style="display:none">0</span></button>
+  <button class="tab" data-p="add"><span class="ic">➕</span><span class="tt">Add</span></button>
+  <button class="tab" data-p="setup"><span class="ic">⚙️</span><span class="tt">Setup</span></button>
+</div></nav>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+
+/* ═══════════════ state ═══════════════ */
+var S = {
+  leads: [],
+  cfg: { url:'', token:'', key:'', rep:'', officePhone:'7609907890' },
+  filters: { q:'', stage:[], temp:[], source:[], due:false, appt:false, sort:'priority' },
+  syncing: false, online: false, queue: []
+};
+
+var STAGES = [
+  { k:'new',       n:'New',           c:'#86b6ef' },
+  { k:'contacted', n:'Contacted',     c:'#5598e7' },
+  { k:'appt_set',  n:'Appt set',      c:'#2a78d6' },
+  { k:'sat',       n:'Sat with them', c:'#1c5cab' },
+  { k:'sold',      n:'Sold',          c:'#104281' },
+  { k:'dead',      n:'Dead',          c:'#898781' }
+];
+var TEMPS   = [{k:'hot',n:'Hot'},{k:'warm',n:'Warm'},{k:'cold',n:'Cold'}];
+var SOURCES = [{k:'knocked',n:'Knocked'},{k:'qr',n:'Self-submitted'},
+               {k:'referral',n:'Referral'},{k:'office',n:'Office'}];
+var stageName = function(k){ for(var i=0;i<STAGES.length;i++) if(STAGES[i].k===k) return STAGES[i].n; return k||'New'; };
+
+/* follow-up cadence, ms, indexed by number of touches already made */
+var CADENCE = [2*3600e3, 24*3600e3, 72*3600e3, 168*3600e3, 336*3600e3, 720*3600e3, 2160*3600e3];
+
+/* ═══════════════ helpers ═══════════════ */
+function ts(v){ if(!v) return 0; var t = new Date(v).getTime(); return isNaN(t) ? 0 : t; }
+function digits(s){ return String(s||'').replace(/\D/g,''); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function rel(t){
+  if(!t) return '';
+  var d = Date.now() - t, a = Math.abs(d), f = d < 0 ? 'in ' : '', s = d < 0 ? '' : ' ago';
+  var m = Math.round(a/60000);
+  if(m < 1) return 'just now';
+  if(m < 60) return f + m + 'm' + s;
+  var h = Math.round(m/60);  if(h < 24) return f + h + 'h' + s;
+  var dd = Math.round(h/24); if(dd < 30) return f + dd + 'd' + s;
+  return f + Math.round(dd/30) + 'mo' + s;
+}
+function fmtAppt(v){
+  var t = ts(v); if(!t) return '';
+  var d = new Date(t);
+  return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}) +
+         ' at ' + d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+}
+function newId(){ return 'L' + Date.now().toString(36) + Math.floor(Math.random()*46656).toString(36); }
+
+function toast(m){ $('toast').textContent = m; $('toast').classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(function(){ $('toast').classList.remove('on'); }, 3200); }
+
+/* ═══════════════ cadence + priority ═══════════════ */
+function dueAt(l){
+  if(l.stage === 'sold' || l.stage === 'dead') return 0;
+  var base = ts(l.lastTouchAt) || ts(l.createdAt);
+  if(!base) return 0;
+  var n = Math.min(parseInt(l.touches,10) || 0, CADENCE.length - 1);
+  return base + CADENCE[n];
+}
+
+/* Returns null when a lead needs nothing right now. */
+function priority(l){
+  var now = Date.now();
+  if(l.stage === 'dead' || l.stage === 'sold') return null;
+
+  var appt = ts(l.apptAt);
+  if(appt){
+    if(appt > now && appt - now < 26*3600e3 && l.apptStatus !== 'confirmed'){
+      return { score:1000, why:'Appointment ' + fmtAppt(l.apptAt) + ' — not confirmed yet',
+               act:'confirm', urgent:true };
+    }
+    if(appt < now && (!l.apptStatus || l.apptStatus === 'set' || l.apptStatus === 'confirmed')){
+      return { score:960, why:'Appointment was ' + rel(appt) + ' — log what happened',
+               act:'outcome', urgent:true };
+    }
+  }
+
+  var touches = parseInt(l.touches,10) || 0;
+  if(touches === 0){
+    var age = now - (ts(l.createdAt) || now);
+    if(age > 2*3600e3)
+      return { score:950, why:'First touch is overdue — came in ' + rel(ts(l.createdAt)),
+               act:'touch', urgent:true };
+    return { score:900 - Math.round(age/60000),
+             why:'New — text within two hours (' + Math.max(0, 120 - Math.round(age/60000)) + 'm left)',
+             act:'touch', urgent:false };
+  }
+
+  var d = dueAt(l);
+  if(d && d <= now){
+    var over = (now - d)/3600e3;
+    var bump = l.temp === 'hot' ? 40 : (l.temp === 'cold' ? -20 : 0);
+    return { score:500 + Math.min(300, over*4) + bump,
+             why:'Follow-up ' + (over < 24 ? 'due' : Math.round(over/24) + 'd overdue') +
+                 ' — touch ' + (touches + 1),
+             act:'touch', urgent:over > 72 };
+  }
+  return null;
+}
+
+function nowList(){
+  return S.leads.map(function(l){ var p = priority(l); return p ? {l:l,p:p} : null; })
+                .filter(Boolean)
+                .sort(function(a,b){ return b.p.score - a.p.score; });
+}
+
+/* ═══════════════ API ═══════════════ */
+function setSync(cls, txt){ $('sync').className = 'sync ' + cls; $('syncTxt').textContent = txt; }
+
+/* Two ways to reach the sheet:
+   - proxy  (default on Vercel): POST /api/leads, secrets live in env vars
+   - direct (no server): POST straight to Apps Script with the token in the body */
+function ep(){ return S.cfg.url ? { u:S.cfg.url, direct:true } : { u:'/api/leads', direct:false }; }
+function connected(){ return Boolean(S.cfg.url || S.cfg.key); }
+
+function api(payload){
+  var e = ep();
+  if(e.direct){
+    return fetch(e.u, {
+      method:'POST', redirect:'follow',
+      /* text/plain keeps this a "simple" request — Apps Script cannot answer a
+         CORS preflight, so application/json would fail here. */
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ token:S.cfg.token }, payload))
+    }).then(function(r){ return r.json(); });
+  }
+  return fetch(e.u, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'X-CRM-Key':S.cfg.key },
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); });
+}
+
+function pull(){
+  if(!connected()){ setSync('', 'not connected'); return Promise.resolve(); }
+  var e = ep();
+  var url = e.direct ? e.u + '?token=' + encodeURIComponent(S.cfg.token)
+                     : e.u + '?key=' + encodeURIComponent(S.cfg.key);
+  S.syncing = true; setSync('busy','syncing…');
+  return fetch(url, {redirect:'follow'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j.ok) throw new Error(j.error || 'rejected');
+      S.leads = j.leads.map(normalise);
+      S.online = true; S.syncing = false;
+      setSync('ok', 'synced ' + new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}));
+      renderAll();
+    })
+    .catch(function(e){
+      S.online = false; S.syncing = false;
+      setSync('bad', 'offline');
+      toast('Could not reach the sheet: ' + e.message);
+    });
+}
+
+function normalise(l){
+  l.touches = parseInt(l.touches,10) || 0;
+  ['name','phone','email','address','city','stage','temp','source','roofType',
+   'damage','notes','apptStatus','rep'].forEach(function(k){ l[k] = l[k] == null ? '' : String(l[k]); });
+  if(!l.stage) l.stage = 'new';
+  if(!l.temp)  l.temp  = 'warm';
+  return l;
+}
+
+function save(lead, quiet){
+  lead.updatedAt = new Date().toISOString();
+  renderAll();
+  if(!connected()){ if(!quiet) toast('Saved in this tab only — set your passcode in SETUP.'); return; }
+  setSync('busy','saving…');
+  api({ action:'update', lead:lead })
+    .then(function(j){
+      if(!j.ok) throw new Error(j.error);
+      setSync('ok','saved');
+      if(!quiet) toast('Saved.');
+    })
+    .catch(function(e){
+      setSync('bad','unsaved changes');
+      S.queue.push(lead);
+      toast('Offline — will retry. ' + e.message);
+    });
+}
+
+function flushQueue(){
+  if(!S.queue.length || !connected()) return;
+  var q = S.queue.slice(); S.queue = [];
+  api({ action:'bulk', leads:q })
+    .then(function(j){ if(j.ok){ toast('Synced ' + j.count + ' queued change(s).'); pull(); } })
+    .catch(function(){ S.queue = q.concat(S.queue); });
+}
+setInterval(flushQueue, 30000);
+
+/* ═══════════════ actions ═══════════════ */
+function logTouch(l, note){
+  l.touches = (parseInt(l.touches,10) || 0) + 1;
+  l.lastTouchAt = new Date().toISOString();
+  if(l.stage === 'new') l.stage = 'contacted';
+  if(note) l.notes = (l.notes ? l.notes + '\n' : '') +
+    '[' + new Date().toLocaleDateString() + '] ' + note;
+  save(l);
+}
+
+function smsHref(phone, body){
+  var ua = navigator.userAgent || '';
+  var sep = /iPhone|iPad|iPod|Mac OS X/i.test(ua) ? '&' : '?';
+  return 'sms:' + digits(phone) + sep + 'body=' + encodeURIComponent(body);
+}
+function firstName(l){ return (l.name || '').split(' ')[0] || 'there'; }
+function rep(){ return S.cfg.rep || 'Sam'; }
+
+function confirmText(l){
+  return 'Hi ' + firstName(l) + ', it\'s ' + rep() + ' from Tidal Remodeling. Just confirming ' +
+         fmtAppt(l.apptAt) + ' at ' + (l.address || 'your place') +
+         ' for the free assessment. Does that still work?';
+}
+function followText(l){
+  var n = parseInt(l.touches,10) || 0;
+  if(n <= 1) return 'Hi ' + firstName(l) + ', this is ' + rep() + ' from Tidal Remodeling — I stopped by ' +
+    (l.address ? 'on ' + l.address : 'earlier today') + '. Here\'s my info so you have it. Happy to get you that free assessment whenever suits.';
+  if(n === 2) return 'Hi ' + firstName(l) + ', ' + rep() + ' from Tidal again. Haven\'t heard back — just wanted to make sure you got my details. Still happy to take a look, no obligation.';
+  return 'Hi ' + firstName(l) + ', ' + rep() + ' from Tidal Remodeling. We\'re doing a fair bit of work around your street at the moment — if you\'d like me to get that assessment booked, just say the word.';
+}
+
+/* ═══════════════ rendering ═══════════════ */
+function leadCard(l, why, urgent, extraActs){
+  var cls = 'lead' + (why ? (urgent ? ' hot' : ' due') : '') + (ts(l.apptAt) > Date.now() ? ' appt' : '');
+  var pills = '<span class="pill s-' + l.stage + '">' + esc(stageName(l.stage)) + '</span>' +
+              (l.temp === 'hot' ? '<span class="pill hot">Hot</span>' : '') +
+              (l.temp === 'cold' ? '<span class="pill cold">Cold</span>' : '');
+  var meta = [];
+  if(l.roofType) meta.push(esc(l.roofType));
+  if(l.lastTouchAt) meta.push('last touch ' + rel(ts(l.lastTouchAt)));
+  else if(l.createdAt) meta.push('added ' + rel(ts(l.createdAt)));
+  if(l.touches) meta.push(l.touches + ' touch' + (l.touches > 1 ? 'es' : ''));
+  if(ts(l.apptAt)) meta.push('appt ' + fmtAppt(l.apptAt) +
+    (l.apptStatus === 'confirmed' ? ' ✓' : ''));
+
+  return '<div class="' + cls + '" data-id="' + esc(l.id) + '">' +
+    '<div class="lhead"><div style="flex:1;min-width:0">' +
+      '<div class="lname">' + esc(l.name || 'No name') + '</div>' +
+      '<div class="laddr">' + esc([l.address, l.city].filter(String).join(', ')) + '</div>' +
+    '</div>' + pills + '</div>' +
+    (why ? '<p class="why' + (urgent ? ' urgent' : '') + '">' + esc(why) + '</p>' : '') +
+    (l.damage ? '<div class="lmeta">Saw: ' + esc(l.damage) + '</div>' : '') +
+    '<div class="lmeta">' + esc(meta.join(' · ')) + '</div>' +
+    '<div class="acts">' + (extraActs || '') +
+      (l.phone ? '<a href="tel:' + digits(l.phone) + '" data-stop="1">Call</a>' : '') +
+      '<button data-act="open">Open</button>' +
+    '</div></div>';
+}
+
+function renderNow(){
+  var list = nowList();
+  $('nowList').innerHTML = list.length ? list.map(function(x){
+    var l = x.l, p = x.p, acts = '';
+    if(p.act === 'confirm')
+      acts = '<a class="p" href="' + esc(smsHref(l.phone, confirmText(l))) + '" data-act="sms-confirm">Text to confirm</a>';
+    else if(p.act === 'outcome')
+      acts = '<button class="p" data-act="outcome">Log outcome</button>';
+    else
+      acts = '<a class="p" href="' + esc(smsHref(l.phone, followText(l))) + '" data-act="sms-follow">Text</a>' +
+             '<button data-act="touch">Mark touched</button>';
+    return leadCard(l, p.why, p.urgent, acts);
+  }).join('') : '<div class="empty">Nothing needs you right now.<br>Go knock — new leads will show up here the moment they land.</div>';
+
+  var due = list.length;
+  $('kDue').textContent = due;
+  $('kAppt').textContent = S.leads.filter(function(l){ return ts(l.apptAt) > Date.now(); }).length;
+  var midnight = new Date(); midnight.setHours(0,0,0,0);
+  $('kNew').textContent = S.leads.filter(function(l){ return ts(l.createdAt) >= midnight.getTime(); }).length;
+  var b = $('badgeNow');
+  b.style.display = due ? 'block' : 'none'; b.textContent = due;
+}
+
+function matches(l){
+  var f = S.filters;
+  if(f.stage.length  && f.stage.indexOf(l.stage) === -1) return false;
+  if(f.temp.length   && f.temp.indexOf(l.temp) === -1) return false;
+  if(f.source.length && f.source.indexOf(l.source) === -1) return false;
+  if(f.due  && !priority(l)) return false;
+  if(f.appt && !ts(l.apptAt)) return false;
+  if(f.q){
+    var hay = [l.name,l.address,l.city,l.phone,l.notes,l.damage,l.roofType].join(' ').toLowerCase();
+    if(hay.indexOf(f.q.toLowerCase()) === -1) return false;
+  }
+  return true;
+}
+
+function renderLeads(){
+  var counts = {}, total = 0;
+  STAGES.forEach(function(s){ counts[s.k] = 0; });
+  S.leads.forEach(function(l){ counts[l.stage] = (counts[l.stage]||0) + 1; });
+  var active = STAGES.filter(function(s){ return s.k !== 'dead'; });
+  active.forEach(function(s){ total += counts[s.k]; });
+
+  $('pipe').innerHTML = total ? active.map(function(s){
+    var n = counts[s.k]; if(!n) return '';
+    var pct = n/total*100;
+    return '<div style="flex:' + n + ';background:' + s.c + '" title="' + s.n + ': ' + n + '">' +
+           (pct > 13 ? n : '') + '</div>';
+  }).join('') : '<div style="flex:1;background:var(--grid);color:var(--muted)">No leads yet</div>';
+
+  $('pipeLegend').innerHTML = STAGES.map(function(s){
+    return '<span><i style="background:' + s.c + '"></i>' + s.n + ' ' + (counts[s.k]||0) + '</span>';
+  }).join('') + (counts.dead ? '' : '');
+
+  var list = S.leads.filter(matches);
+  var f = S.filters;
+  list.sort(function(a,b){
+    if(f.sort === 'priority'){
+      var pa = priority(a), pb = priority(b);
+      return (pb ? pb.score : -1) - (pa ? pa.score : -1);
+    }
+    if(f.sort === 'newest') return ts(b.createdAt) - ts(a.createdAt);
+    if(f.sort === 'oldest') return ts(a.createdAt) - ts(b.createdAt);
+    if(f.sort === 'appt')   return (ts(a.apptAt) || 8e15) - (ts(b.apptAt) || 8e15);
+    if(f.sort === 'name')   return (a.name||'').localeCompare(b.name||'');
+    if(f.sort === 'stale')  return (ts(a.lastTouchAt)||ts(a.createdAt)) - (ts(b.lastTouchAt)||ts(b.createdAt));
+    return 0;
+  });
+
+  $('leadsCount').textContent = list.length === S.leads.length
+    ? 'All leads (' + list.length + ')'
+    : list.length + ' of ' + S.leads.length + ' leads';
+  $('leadList').innerHTML = list.length
+    ? list.map(function(l){ var p = priority(l); return leadCard(l, p && p.why, p && p.urgent, ''); }).join('')
+    : '<div class="empty">No leads match those filters.</div>';
+}
+
+function renderAppts(){
+  var now = Date.now();
+  var withAppt = S.leads.filter(function(l){ return ts(l.apptAt) && l.stage !== 'dead'; });
+  var needC = withAppt.filter(function(l){
+    var t = ts(l.apptAt); return t > now && t - now < 26*3600e3 && l.apptStatus !== 'confirmed'; });
+  var upcoming = withAppt.filter(function(l){
+    var t = ts(l.apptAt); return t > now && !(t - now < 26*3600e3 && l.apptStatus !== 'confirmed'); })
+    .sort(function(a,b){ return ts(a.apptAt) - ts(b.apptAt); });
+  var past = withAppt.filter(function(l){
+    var t = ts(l.apptAt);
+    return t < now && (!l.apptStatus || l.apptStatus === 'set' || l.apptStatus === 'confirmed'); })
+    .sort(function(a,b){ return ts(b.apptAt) - ts(a.apptAt); });
+
+  $('aConfirm').textContent = needC.length;
+  $('aUpcoming').textContent = upcoming.length;
+  $('aOutcome').textContent = past.length;
+  var b = $('badgeAppt');
+  var n = needC.length + past.length;
+  b.style.display = n ? 'block' : 'none'; b.textContent = n;
+
+  $('apptConfirm').innerHTML = needC.length ? needC.map(function(l){
+    return leadCard(l, 'Within 24 hours and unconfirmed — high no-show risk', true,
+      '<a class="p" href="' + esc(smsHref(l.phone, confirmText(l))) + '" data-act="sms-confirm">Text to confirm</a>' +
+      '<button data-act="confirmed">Mark confirmed</button>');
+  }).join('') : '<div class="empty">Nothing needs confirming.</div>';
+
+  $('apptUpcoming').innerHTML = upcoming.length ? upcoming.map(function(l){
+    return leadCard(l, fmtAppt(l.apptAt) + (l.apptStatus === 'confirmed' ? ' — confirmed' : ''), false,
+      '<a href="' + esc(smsHref(l.phone, confirmText(l))) + '" data-act="sms-confirm">Text</a>');
+  }).join('') : '<div class="empty">No upcoming appointments.</div>';
+
+  $('apptPast').innerHTML = past.length ? past.map(function(l){
+    return leadCard(l, 'Was ' + fmtAppt(l.apptAt) + ' — what happened?', true,
+      '<button class="p" data-act="outcome">Log outcome</button>');
+  }).join('') : '<div class="empty">All caught up.</div>';
+}
+
+function renderAll(){ renderNow(); renderLeads(); renderAppts(); }
+
+/* ═══════════════ detail sheet ═══════════════ */
+var openId = null;
+function openLead(id){
+  var l = S.leads.filter(function(x){ return x.id === id; })[0];
+  if(!l) return;
+  openId = id;
+  var tl = (l.notes || '').split('\n').filter(String).reverse()
+            .map(function(n){ return '<div>' + esc(n) + '</div>'; }).join('');
+  $('detailBody').innerHTML =
+    '<div class="lhead"><div style="flex:1"><div class="lname" style="font-size:21px">' + esc(l.name || 'No name') + '</div>' +
+    '<div class="laddr">' + esc([l.address, l.city].filter(String).join(', ')) + '</div></div></div>' +
+    '<div class="acts" style="margin-top:14px">' +
+      (l.phone ? '<a class="p" href="tel:' + digits(l.phone) + '">Call</a>' : '') +
+      (l.phone ? '<a href="' + esc(smsHref(l.phone, followText(l))) + '">Text</a>' : '') +
+      (l.address ? '<a href="https://maps.google.com/?q=' + encodeURIComponent(l.address + ' ' + l.city) + '" target="_blank" rel="noopener">Map</a>' : '') +
+      '<button data-d="touch">Log touch</button>' +
+    '</div>' +
+    '<label>Stage</label><select data-d="stage">' + STAGES.map(function(s){
+      return '<option value="' + s.k + '"' + (l.stage === s.k ? ' selected' : '') + '>' + s.n + '</option>'; }).join('') + '</select>' +
+    '<div class="two"><div><label>Temperature</label><select data-d="temp">' + TEMPS.map(function(t){
+      return '<option value="' + t.k + '"' + (l.temp === t.k ? ' selected' : '') + '>' + t.n + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Source</label><select data-d="source">' + SOURCES.map(function(t){
+      return '<option value="' + t.k + '"' + (l.source === t.k ? ' selected' : '') + '>' + t.n + '</option>'; }).join('') + '</select></div></div>' +
+    '<label>Appointment</label><input type="datetime-local" data-d="apptAt" value="' + esc(toLocalInput(l.apptAt)) + '">' +
+    '<label>Appointment status</label><select data-d="apptStatus">' +
+      ['','set','confirmed','sat','no_show','cancelled'].map(function(k){
+        var n = {'':'—','set':'Set','confirmed':'Confirmed','sat':'Sat with them','no_show':'No-show','cancelled':'Cancelled'}[k];
+        return '<option value="' + k + '"' + (l.apptStatus === k ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select>' +
+    '<label>Phone</label><input data-d="phone" value="' + esc(l.phone) + '">' +
+    '<label>What you saw</label><input data-d="damage" value="' + esc(l.damage) + '">' +
+    '<label>Add a note</label><textarea data-d="newnote" placeholder="What they said, what to do next…"></textarea>' +
+    '<div class="two" style="margin-top:14px">' +
+      '<button class="btn pri" data-d="save" style="min-height:50px">Save</button>' +
+      '<button class="btn" data-d="close" style="min-height:50px">Close</button></div>' +
+    '<button class="btn" data-d="dead" style="width:100%;margin-top:9px;color:var(--crit);border-color:var(--crit)">Mark dead</button>' +
+    (tl ? '<h2>History</h2><div class="tl">' + tl + '</div>' : '') +
+    '<p class="hint">Added ' + rel(ts(l.createdAt)) + (l.touches ? ' · ' + l.touches + ' touches' : '') + '</p>';
+  $('scrim').classList.add('on'); $('detail').classList.add('on');
+}
+function closeLead(){ $('scrim').classList.remove('on'); $('detail').classList.remove('on'); openId = null; }
+$('scrim').addEventListener('click', closeLead);
+
+function toLocalInput(v){
+  var t = ts(v); if(!t) return '';
+  var d = new Date(t - d0offset(t));
+  return d.toISOString().slice(0,16);
+}
+function d0offset(t){ return new Date(t).getTimezoneOffset() * 60000; }
+function fromLocalInput(v){ return v ? new Date(v).toISOString() : ''; }
+
+$('detail').addEventListener('click', function(e){
+  var b = e.target.closest('[data-d]'); if(!b) return;
+  var act = b.dataset.d;
+  var l = S.leads.filter(function(x){ return x.id === openId; })[0]; if(!l) return;
+  if(act === 'close'){ closeLead(); return; }
+  if(act === 'touch'){ logTouch(l); toast('Touch logged.'); openLead(openId); return; }
+  if(act === 'dead'){ l.stage = 'dead'; save(l); closeLead(); toast('Marked dead.'); return; }
+  if(act === 'save'){
+    var q = function(sel){ var el = $('detail').querySelector('[data-d="' + sel + '"]'); return el ? el.value : ''; };
+    l.stage = q('stage'); l.temp = q('temp'); l.source = q('source');
+    l.phone = q('phone'); l.damage = q('damage');
+    l.apptStatus = q('apptStatus');
+    var newAppt = fromLocalInput(q('apptAt'));
+    if(newAppt && newAppt !== l.apptAt && !l.apptStatus) l.apptStatus = 'set';
+    l.apptAt = newAppt;
+    if(l.apptAt && l.stage === 'contacted') l.stage = 'appt_set';
+    var note = q('newnote');
+    if(note) l.notes = (l.notes ? l.notes + '\n' : '') + '[' + new Date().toLocaleDateString() + '] ' + note;
+    save(l); closeLead(); toast('Saved.');
+  }
+});
+
+/* card actions (delegated) */
+document.addEventListener('click', function(e){
+  var card = e.target.closest('.lead'); if(!card) return;
+  var id = card.dataset.id;
+  var l = S.leads.filter(function(x){ return x.id === id; })[0]; if(!l) return;
+  var btn = e.target.closest('[data-act]');
+  if(!btn){ if(!e.target.closest('a')) openLead(id); return; }
+  var act = btn.dataset.act;
+  if(act === 'open'){ openLead(id); return; }
+  if(act === 'touch'){ logTouch(l); toast('Touch logged — next one is scheduled.'); return; }
+  if(act === 'confirmed'){ l.apptStatus = 'confirmed'; logTouch(l, 'Appointment confirmed'); toast('Confirmed.'); return; }
+  if(act === 'sms-confirm'){ l.apptStatus = 'confirmed'; logTouch(l, 'Texted to confirm appointment'); return; }
+  if(act === 'sms-follow'){ logTouch(l, 'Sent follow-up text'); return; }
+  if(act === 'outcome'){ e.preventDefault(); openLead(id);
+    toast('Set the appointment status, then Save.'); return; }
+});
+
+/* ═══════════════ filters ═══════════════ */
+function chipRow(el, items, key){
+  $(el).innerHTML = items.map(function(i){
+    return '<button class="chip" data-k="' + i.k + '">' + i.n + '</button>'; }).join('');
+  $(el).addEventListener('click', function(e){
+    var c = e.target.closest('.chip'); if(!c) return;
+    var k = c.dataset.k, arr = S.filters[key], i = arr.indexOf(k);
+    if(i === -1) arr.push(k); else arr.splice(i,1);
+    c.classList.toggle('on');
+    renderLeads();
+  });
+}
+chipRow('stageChips', STAGES, 'stage');
+chipRow('tempChips', TEMPS, 'temp');
+chipRow('sourceChips', SOURCES, 'source');
+
+document.querySelector('[data-special="due"]').parentNode.addEventListener('click', function(e){
+  var c = e.target.closest('[data-special]'); if(!c) return;
+  var s = c.dataset.special;
+  if(s === 'clear'){
+    S.filters.stage = []; S.filters.temp = []; S.filters.source = [];
+    S.filters.due = false; S.filters.appt = false; S.filters.q = ''; $('q').value = '';
+    document.querySelectorAll('.chip.on').forEach(function(x){ x.classList.remove('on'); });
+  } else {
+    S.filters[s] = !S.filters[s]; c.classList.toggle('on');
+  }
+  renderLeads();
+});
+$('q').addEventListener('input', function(){ S.filters.q = this.value; renderLeads(); });
+$('sortBy').addEventListener('change', function(){ S.filters.sort = this.value; renderLeads(); });
+
+/* ═══════════════ add ═══════════════ */
+$('addBtn').addEventListener('click', function(){
+  var name = $('aName').value.trim(), phone = $('aPhone').value.trim();
+  if(!name && !phone){ toast('Needs at least a name or a phone number.'); return; }
+  var appt = fromLocalInput($('aAppt').value);
+  var l = normalise({
+    id:newId(), createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(),
+    name:name, phone:phone, email:$('aEmail').value.trim(),
+    address:$('aAddr').value.trim(), city:$('aCity').value.trim(),
+    source:'knocked', stage: appt ? 'appt_set' : $('aStage').value,
+    temp:$('aTemp').value, roofType:$('aRoof').value, damage:$('aDamage').value.trim(),
+    notes:$('aNotes').value.trim(), touches: $('aStage').value === 'new' ? 0 : 1,
+    lastTouchAt: $('aStage').value === 'new' ? '' : new Date().toISOString(),
+    apptAt:appt, apptStatus: appt ? 'set' : '', rep:rep()
+  });
+  S.leads.unshift(l);
+  save(l);
+  ['aName','aPhone','aCity','aAddr','aEmail','aDamage','aNotes','aAppt'].forEach(function(i){ $(i).value = ''; });
+  toast('Lead saved.' + (appt ? ' Text to confirm within two hours.' : ''));
+  switchTab('now');
+});
+
+/* ═══════════════ setup ═══════════════ */
+function readHash(){
+  var h = location.hash.replace(/^#/,''); if(!h) return;
+  h.split('&').forEach(function(kv){
+    var p = kv.split('='), k = decodeURIComponent(p[0]), v = decodeURIComponent(p.slice(1).join('=') || '');
+    if(k === 'url') S.cfg.url = v;
+    if(k === 'token') S.cfg.token = v;
+    if(k === 'key') S.cfg.key = v;
+    if(k === 'rep') S.cfg.rep = v;
+  });
+}
+$('cfgSave').addEventListener('click', function(){
+  S.cfg.key = $('cfgKey').value.trim();
+  S.cfg.url = $('cfgUrl').value.trim();
+  S.cfg.token = $('cfgTok').value.trim();
+  S.cfg.rep = $('cfgRep').value.trim();
+  if(!connected()){ toast('Enter your CRM passcode first.'); return; }
+  pull().then(function(){
+    if(S.online){ toast('Connected. ' + S.leads.length + ' lead(s) in the sheet.'); updateWarn(); }
+  });
+});
+$('cfgLink').addEventListener('click', function(){
+  if(!connected()){ toast('Connect first.'); return; }
+  var link = location.origin + location.pathname + '#key=' + encodeURIComponent(S.cfg.key) +
+             '&url=' + encodeURIComponent(S.cfg.url) +
+             '&token=' + encodeURIComponent(S.cfg.token) + '&rep=' + encodeURIComponent(S.cfg.rep);
+  location.hash = link.split('#')[1];
+  if(navigator.clipboard) navigator.clipboard.writeText(link).catch(function(){});
+  toast('Link copied — now Share → Add to Home Screen.');
+});
+function updateWarn(){ $('setupWarn').style.display = connected() ? 'none' : 'block'; }
+
+$('exportBtn').addEventListener('click', function(){
+  var cols = ['id','createdAt','name','phone','email','address','city','source','stage','temp',
+              'roofType','damage','lastTouchAt','touches','apptAt','apptStatus','notes'];
+  var rows = [cols].concat(S.leads.map(function(l){
+    return cols.map(function(c){ return l[c] == null ? '' : l[c]; }); }));
+  var csv = rows.map(function(r){ return r.map(function(v){
+    return '"' + String(v).replace(/"/g,'""') + '"'; }).join(','); }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'tidal-leads-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+});
+
+/* ═══════════════ tabs ═══════════════ */
+function switchTab(p){
+  document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('on', x.dataset.p === p); });
+  document.querySelectorAll('.pane').forEach(function(x){ x.classList.remove('on'); });
+  $('p-' + p).classList.add('on');
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){ switchTab(t.dataset.p); });
+});
+$('syncBtn').addEventListener('click', function(){ pull(); flushQueue(); });
+
+/* ═══════════════ go ═══════════════ */
+readHash();
+$('cfgUrl').value = S.cfg.url; $('cfgTok').value = S.cfg.token;
+$('cfgKey').value = S.cfg.key; $('cfgRep').value = S.cfg.rep;
+updateWarn();
+renderAll();
+if(connected()) pull();
+setInterval(function(){ if(connected() && !S.syncing) pull(); }, 180000);
+window.__crm = S;                       /* test hook */
+})();
+</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})});</script>
+</body>
+</html>

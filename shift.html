@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#fcfcfb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Tidal Field — Shift Tool</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+
+<style>
+  :root{
+    --surface-1:#fcfcfb; --plane:#f4f3f0; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --baseline:#c3c2b7; --ring:rgba(11,11,11,0.10);
+    --accent:#2a78d6; --accent-soft:#cde2fb;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --tap:64px;
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:var(--plane); color:var(--ink);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-text-size-adjust:100%; overscroll-behavior:none;
+  }
+  .app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;background:var(--surface-1)}
+
+  /* ---------- header ---------- */
+  header{position:sticky;top:0;z-index:20;background:var(--surface-1);border-bottom:1px solid var(--grid)}
+  .bar{display:flex;align-items:center;gap:10px;padding:10px 14px 8px}
+  .clock{font-size:30px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .clock.over{color:var(--crit)}
+  .clocklbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+  .bar .sp{flex:1}
+  .btn{border:1px solid var(--baseline);background:var(--surface-1);color:var(--ink);
+       border-radius:10px;padding:9px 13px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn:active{background:var(--plane)}
+  .btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+  .pacewrap{padding:0 14px 10px}
+  .track{height:8px;border-radius:99px;background:var(--grid);overflow:hidden;position:relative}
+  .fill{height:100%;border-radius:99px;background:var(--accent);transition:width .3s ease}
+  .fill.good{background:var(--good)} .fill.warn{background:var(--warn)} .fill.crit{background:var(--crit)}
+  .pacetxt{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-top:5px}
+  .pacetxt b{font-variant-numeric:tabular-nums}
+
+  /* ---------- panes ---------- */
+  main{flex:1;padding:14px 14px calc(96px + var(--safe-b))}
+  .pane{display:none} .pane.on{display:block}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 9px;font-weight:700}
+  h2:first-child{margin-top:2px}
+
+  /* ---------- knock buttons ---------- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+  .kb{min-height:var(--tap);border:1.5px solid var(--baseline);background:var(--surface-1);
+      border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:2px;cursor:pointer;padding:8px 6px;user-select:none;transition:transform .06s}
+  .kb:active{transform:scale(.97);background:var(--plane)}
+  .kb .n{font-size:13px;font-weight:700;letter-spacing:.01em;text-align:center;line-height:1.2}
+  .kb .c{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  .kb.big{min-height:86px} .kb.big .n{font-size:16px} .kb.big .c{font-size:28px}
+  .kb.answered{border-color:var(--accent);border-width:2px}
+  .kb.appt{border-color:var(--good);border-width:2px}
+  .kb.appt .c{color:var(--good)}
+
+  /* ---------- stat tiles ---------- */
+  .tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+  .tile{background:var(--surface-1);border:1px solid var(--grid);border-radius:12px;padding:11px 10px}
+  .tile .v{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+  .tile .l{font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.02em}
+  .tile .s{font-size:11px;color:var(--ink-2);margin-top:2px}
+
+  /* ---------- cards ---------- */
+  .card{background:var(--surface-1);border:1px solid var(--grid);border-radius:13px;padding:14px;margin-bottom:10px}
+  .card.lead{border-left:4px solid var(--accent)}
+  .card h3{margin:0 0 7px;font-size:16px;font-weight:700;line-height:1.3}
+  .card p{margin:0 0 9px;font-size:15px;color:var(--ink-2)}
+  .card p:last-child{margin-bottom:0}
+  .say{background:var(--accent-soft);border:0;border-left:4px solid var(--accent);border-radius:9px;
+       padding:12px 13px;font-size:16px;line-height:1.5;color:var(--ink);margin:9px 0}
+  .say em{font-style:normal;background:rgba(255,255,255,.75);padding:0 4px;border-radius:3px;font-weight:600}
+  .warnbox{background:#fdf4e3;border-left:4px solid var(--warn);border-radius:9px;padding:11px 13px;font-size:14px;margin:9px 0}
+  .nobox{background:#fbeceb;border-left:4px solid var(--crit);border-radius:9px;padding:11px 13px;font-size:14px;margin:9px 0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+       padding:3px 8px;border-radius:99px;background:var(--plane);color:var(--ink-2);margin-bottom:8px}
+  .tag.hot{background:#e6f5e6;color:#06630a}
+
+  /* ---------- accordion ---------- */
+  details{border:1px solid var(--grid);border-radius:12px;margin-bottom:8px;background:var(--surface-1);overflow:hidden}
+  details[open]{border-color:var(--baseline)}
+  summary{padding:14px;font-size:15px;font-weight:650;cursor:pointer;list-style:none;display:flex;
+          align-items:center;gap:9px;min-height:52px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";margin-left:auto;color:var(--muted);font-size:20px;font-weight:400;flex:none}
+  details[open] summary::after{content:"−"}
+  .dbody{padding:0 14px 14px;font-size:15px;color:var(--ink-2)}
+  .dbody p{margin:0 0 9px} .dbody p:last-child{margin-bottom:0}
+
+  /* ---------- script stepper ---------- */
+  .stepnav{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  .stepnav .btn{flex:1}
+  .dots{display:flex;gap:5px;justify-content:center;margin:12px 0 4px}
+  .dot{width:7px;height:7px;border-radius:99px;background:var(--grid)}
+  .dot.on{background:var(--accent);width:20px}
+  .branch{display:grid;gap:8px;margin-top:10px}
+  .branch .btn{text-align:left;padding:12px 13px;font-weight:600}
+
+  /* ---------- log ---------- */
+  .log{font-size:13px;color:var(--ink-2);max-height:190px;overflow:auto;border:1px solid var(--grid);
+       border-radius:10px;padding:9px 11px;font-variant-numeric:tabular-nums}
+  .log div{padding:3px 0;border-bottom:1px solid var(--grid)}
+  .log div:last-child{border:0}
+  textarea{width:100%;min-height:90px;border:1px solid var(--baseline);border-radius:10px;padding:11px;
+           font:15px/1.45 system-ui,sans-serif;color:var(--ink);background:var(--surface-1);resize:vertical}
+  input[type=number]{width:72px;border:1px solid var(--baseline);border-radius:8px;padding:8px;
+           font:15px system-ui,sans-serif;text-align:center;color:var(--ink);background:var(--surface-1)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--grid)}
+  .row:last-child{border:0}
+  .row .lbl{font-size:15px}
+  .row .sub{font-size:12px;color:var(--muted)}
+
+  /* ---------- nudge toast ---------- */
+  .nudge{position:fixed;left:50%;transform:translateX(-50%) translateY(140%);
+    bottom:calc(88px + var(--safe-b));width:min(520px,calc(100% - 28px));z-index:40;
+    background:var(--ink);color:#fff;border-radius:13px;padding:13px 15px;font-size:15px;font-weight:600;
+    box-shadow:0 8px 28px rgba(0,0,0,.25);transition:transform .28s cubic-bezier(.3,1.2,.5,1);
+    display:flex;align-items:center;gap:11px}
+  .nudge.show{transform:translateX(-50%) translateY(0)}
+  .nudge .x{margin-left:auto;background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:8px;
+            padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;flex:none}
+
+  /* ---------- tab bar ---------- */
+  nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--surface-1);
+      border-top:1px solid var(--grid);padding-bottom:var(--safe-b)}
+  .tabs{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+  .tab{border:0;background:none;padding:9px 3px 10px;cursor:pointer;display:flex;flex-direction:column;
+       align-items:center;gap:3px;color:var(--muted);font:inherit}
+  .tab .ic{font-size:19px;line-height:1}
+  .tab .tl{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .tab.on{color:var(--accent)}
+  .muted{color:var(--muted);font-size:13px}
+  .hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+  hr{border:0;border-top:1px solid var(--grid);margin:18px 0}
+  @media (max-width:360px){ .kb .n{font-size:12px} .tile .v{font-size:22px} }
+
+  /* ---------- auto-logging ---------- */
+  .auto{border:1.5px solid var(--grid);border-radius:13px;padding:12px 13px;margin-bottom:11px;
+        background:var(--surface-1)}
+  .auto.live{border-color:var(--good);border-width:2px;background:#f4fbf4}
+  .auto.dwell{border-color:var(--warn);background:#fdf9ef}
+  .autohead{display:flex;align-items:center;gap:9px}
+  .autohead .lbl{font-size:14px;font-weight:700;flex:1}
+  .pulse{width:10px;height:10px;border-radius:99px;background:var(--muted);flex:none}
+  .auto.live .pulse{background:var(--good);animation:pp 1.6s ease-in-out infinite}
+  .auto.dwell .pulse{background:var(--warn);animation:pp .7s ease-in-out infinite}
+  @keyframes pp{0%,100%{box-shadow:0 0 0 0 rgba(12,163,12,.45)}50%{box-shadow:0 0 0 7px rgba(12,163,12,0)}}
+  .autobody{font-size:12.5px;color:var(--ink-2);margin-top:8px;line-height:1.5}
+  .gauges{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:9px}
+  .g{background:var(--plane);border-radius:9px;padding:7px 8px;text-align:center}
+  .g .gv{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+  .g .gl{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  .dwellbar{height:5px;border-radius:99px;background:var(--grid);margin-top:9px;overflow:hidden}
+  .dwellbar i{display:block;height:100%;background:var(--warn);width:0;transition:width .4s linear}
+  .seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px}
+  .seg button{border:1px solid var(--baseline);background:var(--surface-1);border-radius:9px;
+              padding:9px 4px;font:600 12.5px system-ui,sans-serif;color:var(--ink-2);cursor:pointer}
+  .seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .banner{background:#fbeceb;border-left:4px solid var(--crit);border-radius:9px;padding:11px 13px;
+          font-size:13.5px;line-height:1.5;margin-bottom:11px;display:none}
+  .banner.on{display:block}
+  .banner b{display:block;margin-bottom:3px}
+
+  /* ---------- route map ---------- */
+  .routebox{border:1px solid var(--grid);border-radius:12px;padding:10px;background:var(--surface-1)}
+  .routebox svg{display:block;width:100%;height:auto;border-radius:8px;background:var(--plane)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-2)}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:5px;vertical-align:0}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="bar">
+    <div>
+      <div class="clock" id="clock">4:00:00</div>
+      <div class="clocklbl" id="clocklbl">shift not started</div>
+    </div>
+    <div class="sp"></div>
+    <button class="btn pri" id="startBtn">Start shift</button>
+    <button class="btn sm" id="undoBtn" title="Undo last tap">Undo</button>
+  </div>
+  <div class="pacewrap">
+    <div class="track"><div class="fill" id="paceFill" style="width:0%"></div></div>
+    <div class="pacetxt"><span id="paceMsg">Tap Start when you knock your first door.</span><span><b id="paceRate">0</b>/hr</span></div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ KNOCK ============ -->
+<section class="pane on" id="p-knock">
+
+  <div class="banner" id="geoBanner"><b id="geoBannerT"></b><span id="geoBannerB"></span></div>
+
+  <div class="auto" id="autoBox">
+    <div class="autohead">
+      <span class="pulse"></span>
+      <span class="lbl" id="autoLbl">Auto-log doors</span>
+      <button class="btn sm" id="autoBtn">Turn on</button>
+    </div>
+    <div class="autobody" id="autoBody">Uses GPS to log a door every time you stop at one, so you only tap when someone actually answers.</div>
+    <div class="dwellbar"><i id="dwellFill"></i></div>
+    <div class="gauges">
+      <div class="g"><div class="gv" id="gAcc">—</div><div class="gl">GPS ± m</div></div>
+      <div class="g"><div class="gv" id="gMove">—</div><div class="gl">m from last</div></div>
+      <div class="g"><div class="gv" id="gAuto">0</div><div class="gl">auto doors</div></div>
+    </div>
+    <div class="seg" id="sens">
+      <button data-s="tight">Tight lots</button>
+      <button data-s="normal" class="on">Normal</button>
+      <button data-s="loose">Big lots</button>
+    </div>
+    <div class="autobody" id="sensNote">Normal: logs a door after <b>20s</b> stopped, if you've moved <b>18m</b> from the last one.</div>
+  </div>
+
+  <div class="grid2">
+    <div class="kb big" data-ev="noans"><span class="n">NO ANSWER</span><span class="c" id="c-noans">0</span></div>
+    <div class="kb big answered" data-ev="contact"><span class="n">ANSWERED</span><span class="c" id="c-contact">0</span></div>
+  </div>
+  <p class="hint" id="upgHint" style="margin-top:7px">Tapping <b>ANSWERED</b> upgrades the door you just logged — it won't double-count.</p>
+  <div class="grid3" style="margin-top:9px">
+    <div class="kb" data-ev="pitch"><span class="n">PITCHED</span><span class="c" id="c-pitch">0</span></div>
+    <div class="kb appt" data-ev="appt"><span class="n">APPT SET</span><span class="c" id="c-appt">0</span></div>
+    <div class="kb" data-ev="callback"><span class="n">CALLBACK</span><span class="c" id="c-callback">0</span></div>
+  </div>
+  <div class="grid2" style="margin-top:9px">
+    <div class="kb" data-ev="ni"><span class="n">NOT INTERESTED</span><span class="c" id="c-ni">0</span></div>
+    <div class="kb" data-ev="skip"><span class="n">SKIP (sign/gate)</span><span class="c" id="c-skip">0</span></div>
+  </div>
+
+  <h2>Right now</h2>
+  <div class="tiles">
+    <div class="tile"><div class="v" id="t-doors">0</div><div class="l">Doors</div><div class="s" id="t-doorsub">&nbsp;</div></div>
+    <div class="tile"><div class="v" id="t-conv">0</div><div class="l">Conversations</div><div class="s" id="t-convsub">&nbsp;</div></div>
+    <div class="tile"><div class="v" id="t-appt">0</div><div class="l">Appointments</div><div class="s" id="t-apptsub">&nbsp;</div></div>
+  </div>
+  <p class="hint" id="reality">A normal good shift is ~65 doors, ~20 conversations, 1–2 appointments. Sixty rejections is what success looks like from the inside.</p>
+
+  <h2>Last 12 taps</h2>
+  <div class="log" id="log"><div class="muted">Nothing logged yet.</div></div>
+</section>
+
+<!-- ============ SAY ============ -->
+<section class="pane" id="p-say">
+  <div class="stepnav">
+    <button class="btn" id="prevStep">← Back</button>
+    <button class="btn pri" id="nextStep">Next →</button>
+    <button class="btn sm" id="resetStep">Top</button>
+  </div>
+  <div id="scriptCard"></div>
+  <div class="dots" id="dots"></div>
+</section>
+
+<!-- ============ SEE ============ -->
+<section class="pane" id="p-see">
+  <div class="card lead">
+    <span class="tag hot">Your edge — run this first</span>
+    <h3>1990s tile roof, 25–35 yrs old</h3>
+    <p><b>The tile isn't the part that wears out.</b> Concrete tile lasts 50+ years. The felt underlayment beneath it is the wear item — typically rated in the <b>20–30 year</b> range, older organic felt shorter. So the tile looks perfect and the roof is still done.</p>
+    <p><b>Look for:</b> cracked or displaced ridge caps at the peak, a tile slipped out of course, crumbling ridge mortar, sagging planes.</p>
+    <div class="say">"That's concrete tile — good roof, the tile will outlast both of us. What most people don't know is the tile isn't the part that wears out. Underneath it there's a layer of felt, and <em>that's</em> the piece with a clock on it — usually somewhere in the twenty-to-thirty-year range. Given when this neighborhood went up, yours is probably still original. <em>Whether it's done is something I honestly can't tell you from the driveway</em> — somebody has to pull tiles and look. But if it is, the fix isn't a new roof. It's lifting your tile, replacing the felt, setting the same tile back down."</div>
+    <div class="warnbox"><b>Two phrasing traps.</b> Don't quote a tight band like "20–28 years" — published ranges run longer and a competitor will contradict you with 30+. And don't say "your tile isn't waterproof"; codes treat tile as the primary water-<i>shedding</i> layer. <b>Anchor on age instead — "this roof is thirty years old and that felt is almost certainly original" is a fact nobody can take from you.</b></div>
+  </div>
+
+  <h2>The other five sightings</h2>
+
+  <details><summary>Missing shingles / tabs</summary><div class="dbody">
+    <p><b>Looks like:</b> rectangular gaps showing black underlayment or a different colour, sometimes stair-stepped.</p>
+    <p><b>True:</b> a real breach of the primary covering. The one sighting that honestly justifies "before the rains."</p>
+    <div class="say">"You've got two tabs gone on the west slope — that's the covering actually open, not just worn."</div>
+    <div class="nobox"><b>Don't:</b> call a shingle that's merely unsealed but intact "damage." Not creased, folded, torn or missing = not wind damage. A second opinion will catch you.</div>
+  </div></details>
+
+  <details><summary>Cracked / missing ridge caps</summary><div class="dbody">
+    <p><b>Looks like:</b> split, lifted, or missing caps along the peak; a ragged or gapped ridge line.</p>
+    <p><b>True:</b> caps take the most UV and thermal movement of anything on the roof and they cover a continuous open seam. Looks minor, genuinely isn't. <b>Best honesty-to-urgency ratio you have.</b></p>
+    <div class="say">"From right here I can see three or four cracked ridge caps along the peak. That's the seam at the very top of the roof and those caps are the only thing over it."</div>
+  </div></details>
+
+  <details><summary>Granule loss</summary><div class="dbody">
+    <p><b>Looks like:</b> roof reads mottled from the street; granules in gutters, at downspout splash zones, in planter beds under the eaves.</p>
+    <p><b>True:</b> granules exist to block UV from reaching the asphalt. Gone = the asphalt ages fast.</p>
+    <div class="say">"See the grit in the planter under the downspout? Those are the granules off your shingles. They're the sunscreen — once they're gone the asphalt underneath starts cooking."</div>
+    <div class="warnbox"><b>Honest boundary:</b> heavy shedding in year one is normal. A few granules after hard rain at year ten is normal. <b>Meaningful</b> = an inch in a gutter run, or bald areas showing black. Granules in a gutter on a 6-year-old roof is not an emergency — saying it is loses you the deal.</div>
+  </div></details>
+
+  <details><summary>Exposed fiberglass mat (the shiny patches)</summary><div class="dbody">
+    <p><b>Looks like:</b> shiny/glassy patches or faint white-grey fibre texture, clearest on shingle edges in low sun.</p>
+    <p><b>Know which of three you're seeing:</b></p>
+    <p>· Small round evenly-scattered pockmarks = <b>blister craters</b>. Year-one ventilation artifact. Don't leak.<br>
+       · Localised irregular scuffing in traffic paths = cosmetic.<br>
+       · <b>Broad contiguous bald areas across many shingles, worst on south/west slopes = true field erosion. This one means end of life.</b></p>
+    <div class="say">"Once the mat's showing across a slope, that roof's basically stopped being repairable — the shingles get brittle enough a roofer can't walk it or patch it without breaking more than he fixes. <em>You're not choosing between repair and replacement anymore, you're choosing when.</em>"</div>
+    <div class="nobox"><b>Don't say:</b> "that's a hole and water's pouring into your decking." Asphalt roofs have double/triple coverage — a bald patch is not a hole. And no manufacturer publishes a years-to-failure number, so don't quote one. "A few seasons, not a decade" — labelled as an estimate.</div>
+  </div></details>
+
+  <details><summary>Fascia &amp; eave rot — your best honest finding</summary><div class="dbody">
+    <p><b>Looks like:</b> paint blistering in bands along the fascia, dark grey/black streaking, a fascia line that waves or dips, gutter pulling away where the wood is also discoloured.</p>
+    <p><b>Why it's the best one:</b> it's the only part of the roof assembly you can see <i>up close and at eye level</i> from the driveway. It's a fact you point at, not an inference.</p>
+    <p>Wet rot = black, soft, spongy, bubbling paint. Dry rot = brown, cracking, splitting, powdery.</p>
+    <div class="say">"Come look at this with me — right here where the gutter's pulling away, that wood's gone soft. That's the one part of the roof I can actually see up close from the ground."</div>
+    <div class="warnbox"><b>Boundary:</b> "the fascia is soft here" ✓. "...therefore your rafters and decking are rotted" ✗. That needs probing.</div>
+  </div></details>
+
+  <h2>How to say it so it lands</h2>
+  <div class="card">
+    <p><b>Name the thing, the place, and your vantage.</b> Not "your roof's in bad shape." → "From right here I can see three cracked ridge caps on this side."</p>
+    <p><b>Grade it plainly:</b> minor / moderate / extreme. "Moderate curling on the south slope" beats "severe clawing and thermal degradation" — the second sounds like a script.</p>
+    <p><b>Definitive about what you saw, hedged about what you concluded.</b></p>
+    <p><b>Say the limit of your vantage out loud.</b> Highest-trust move available, costs nothing: <i>"I can't see the north slope from the street, and I can't tell you anything about the decking or the attic from down here."</i> It makes everything else you said <i>more</i> believable.</p>
+  </div>
+</section>
+
+<!-- ============ STUCK ============ -->
+<section class="pane" id="p-stuck">
+  <p class="hint" style="margin:0 0 12px">Don't memorise all of these. Knock first, find the three you actually get, drill those three.</p>
+  <div id="objList"></div>
+
+  <h2>Where you stand</h2>
+  <div class="card">
+    <p><b>4–5 feet back</b> from the door, never on the mat. <b>To the side</b> of the doorway, not squared in the peephole, body angled ~45° toward the street.</p>
+    <p><b>When it opens, step back again.</b> Strongest "I'm not a threat" signal there is, and almost nobody does it.</p>
+    <p>Hands visible. Phone/clipboard low at your side. <b>Slow down</b> — fast talking is <i>the</i> scammer tell. Break eye contact deliberately: gesture at the roof, the ridge, down the street.</p>
+    <p><b>Repeat their exact words back, not a paraphrase.</b> They say "timing's bad" → you say "timing's bad, got it." Verbatim mirroring is the best-evidenced likability move in the research.</p>
+  </div>
+  <h2>The eight facts — all checkable in 30 seconds</h2>
+  <div class="card">
+    <p><b>CSLB #984966</b> · Class B General Building, current and active through July 2027, bonded. Say <b>"licensed and bonded,"</b> not "insured" — CSLB verifies the bond and workers' comp, not general liability.</p>
+    <p><b>GAF Master Elite</b> — GAF's top contractor tier. Qualifying systems are <b>eligible for</b> the Golden Pledge Limited Warranty. Say <i>eligible</i>, never <i>qualifies</i>: it needs a Timberline shingle plus five GAF accessories plus a factory inspection.</p>
+    <p><b>BBB Accredited since 2023, rated A.</b> A — not A+. An old listing says A+ and it's wrong; a homeowner checks and you've lost the conversation.</p>
+    <p><b>Local since 2013</b> · 5375 Avenida Encinas, Suite A, Carlsbad · office <b>(760) 990-7890</b>, Mon–Fri 9–5.</p>
+    <p><b>Free assessment, no obligation.</b> They say "assessment" and "consultation" — match their language.</p>
+    <p>Tidal crews, not subs · daily updates · fixed pricing · the <b>Advantage+</b> program (ask your manager what's actually in it before you mention it).</p>
+    <div class="nobox"><b>Don't claim:</b> financing (unverified — confirm internally) · Owens Corning or CertainTeed certification (no evidence) · BBB "A+" (it's A).</div>
+    <div class="warnbox"><b>Two licence numbers exist.</b> #984966 (Tidal Remodeling) and #1135348 (Tidal Remodeling <b>USA Inc</b>, issued 2025). Ask which entity writes the contracts and quote <i>that</i> one — a number at the door that doesn't match the contract is exactly what a suspicious homeowner finds.</div>
+  </div>
+
+  <div class="card">
+    <span class="tag">The two moves nobody else makes</span>
+    <p><b>1. Volunteer the licence number.</b> "Tidal Remodeling, licence 984966 — you can look us up at cslb.ca.gov, takes thirty seconds." Verifiable in a minute. A scammer can't produce one.</p>
+    <p><b>2. Use the RepCard badge as ID verification, not a business card.</b> "Scan this — it'll pull up my verification against the company." Completely inverts the frame you're fighting.</p>
+  </div>
+  <div class="nobox">
+    <b>Hard stops.</b> Any posted "No Soliciting" sign — leave, no knock, no pitch. Gated communities and HOAs enforce as trespass.<br><br>
+    <b>Hours in Carlsbad: 8am–8pm</b> (CMC §8.34.060, 9pm during daylight saving). The "9am–8pm" rule you'll find quoted online is the <i>City of San Diego</i> ordinance — different jurisdiction, and SDPD stopped enforcing it in 2022. Don't quote the wrong city's rule.
+  </div>
+  <div class="warnbox">
+    <b>Stay in your lane.</b> Don't quote price, discuss financing, or handle cost objections at the door — that can push you out of the appointment-setter exemption and into needing CSLB Home Improvement Salesperson registration. Ask your manager which one you are.
+  </div>
+</section>
+
+<!-- ============ DAY ============ -->
+<section class="pane" id="p-day">
+  <h2>Shift summary</h2>
+  <div class="tiles">
+    <div class="tile"><div class="v" id="s-doors">0</div><div class="l">Doors</div></div>
+    <div class="tile"><div class="v" id="s-rate">—</div><div class="l">Contact rate</div><div class="s">target 25–35%</div></div>
+    <div class="tile"><div class="v" id="s-appt">0</div><div class="l">Appts</div></div>
+  </div>
+  <div class="tiles" style="margin-top:9px">
+    <div class="tile"><div class="v" id="s-conv">0</div><div class="l">Conversations</div></div>
+    <div class="tile"><div class="v" id="s-per">—</div><div class="l">Conv/appt</div><div class="s">target 15–25</div></div>
+    <div class="tile"><div class="v" id="s-hr">0</div><div class="l">Doors/hr</div><div class="s">target 15–20</div></div>
+  </div>
+
+  <h2>Where you walked</h2>
+  <div class="routebox">
+    <div id="routeSvg"><p class="muted" style="margin:26px 0;text-align:center">Turn on auto-logging and your route shows up here.</p></div>
+    <div class="legend">
+      <span><i style="background:#898781"></i>No answer</span>
+      <span><i style="background:#2a78d6"></i>Conversation</span>
+      <span><i style="background:#eda100"></i>Callback</span>
+      <span><i style="background:#0ca30c"></i>Appointment</span>
+      <span id="routeDist" class="muted"></span>
+    </div>
+  </div>
+  <p class="hint">Use this to see which streets you actually covered, and where the re-knocks are. Roughly 70% of doors won't answer — that's your second pass.</p>
+
+  <h2>Where the funnel is leaking</h2>
+  <div class="card" id="diagnosis"><p class="muted">Log a shift and this will tell you the one thing to change tomorrow.</p></div>
+
+  <h2>Tomorrow's one fix</h2>
+  <textarea id="onefix" placeholder="Exactly one thing. Not four."></textarea>
+
+  <h2>Notes / callbacks</h2>
+  <textarea id="notes" placeholder="Addresses, names, what they said, who to re-knock…"></textarea>
+
+  <h2>Save it — nothing here survives a closed tab</h2>
+  <div class="grid2">
+    <button class="btn pri" id="copyBtn" style="min-height:52px">Copy summary</button>
+    <button class="btn" id="dlBtn" style="min-height:52px">Download CSV</button>
+  </div>
+  <p class="hint">Copy the summary into RepCard notes or text it to your manager at the end of every block. The CSV keeps the raw taps.</p>
+
+  <h2>Targets</h2>
+  <div class="card" style="padding:4px 14px">
+    <div class="row"><div><div class="lbl">Shift length</div><div class="sub">hours</div></div><input type="number" id="setHours" value="4" min="1" max="12" step="0.5"></div>
+    <div class="row"><div><div class="lbl">Doors per hour</div><div class="sub">15–20 is sustainable</div></div><input type="number" id="setRate" value="16" min="5" max="40"></div>
+    <div class="row"><div><div class="lbl">Appointment goal</div><div class="sub">1–3 per 4-hr block is normal</div></div><input type="number" id="setAppt" value="2" min="1" max="20"></div>
+    <div class="row"><div><div class="lbl">RepCard nudge</div><div class="sub">reminder after every conversation</div></div>
+      <button class="btn sm" id="nudgeToggle">On</button></div>
+    <div class="row"><div><div class="lbl">Keep screen awake</div><div class="sub">while the shift runs</div></div>
+      <button class="btn sm" id="wakeState">—</button></div>
+  </div>
+
+  <h2>Getting auto-logging working</h2>
+  <div class="card">
+    <p><b>Phone browsers only give GPS to pages served over <code>https://</code>.</b> A file opened straight from your downloads won't get location — that's a browser rule, not a bug here.</p>
+    <p><b>The 60-second fix:</b> go to <b>app.netlify.com/drop</b> on a laptop, drag this HTML file onto the page, and it hands you a live https link. Open that link on your phone, then <b>Share → Add to Home Screen</b>. Now it launches like an app and GPS works.</p>
+    <p>Then: open it, hit <b>Start shift</b>, hit <b>Turn on</b> under Auto-log doors, and allow location when your phone asks. Choose <b>Always</b> or <b>While using</b> — not "Ask next time."</p>
+    <div class="warnbox"><b>Two things to know.</b> High-accuracy GPS eats battery — expect roughly 15–25% over a four-hour block, so carry a power bank. And the app has to stay <b>open and in front</b>; if you switch to another app or the screen sleeps, tracking pauses. That's what the screen-awake setting is for. If you do lose it, nothing is lost — just tap doors manually until you're back.</div>
+    <p><b>How accurate is it, really?</b> In simulation it catches every door on a clean walk. In the field expect roughly <b>85–95%</b> — consumer GPS is accurate to about 5–15m and houses here sit 15–25m apart, so it's working near the edge of what the hardware can resolve. It's deliberately tuned to <b>miss a door rather than invent one</b>, because inflated numbers would make you misdiagnose your own funnel.</p>
+    <p><b>Calibrate on your first street.</b> Count doors in your head for one block and compare to the auto counter. If it's missing doors, switch to <b>Tight lots</b>. If it's logging phantom ones, switch to <b>Big lots</b>. Watch the panel while you walk — it tells you what it thinks you're doing.</p>
+    <p>Anything wrong, hit <b>Undo</b>, or tap <b>NO ANSWER</b> to add one it missed. Tapping and auto-logging work together; neither cancels the other.</p>
+    <p class="hint" style="margin:0">Your location never leaves the phone. There's no server, no account, nothing uploaded, and no map service contacted. It only lands in the CSV you download yourself.</p>
+  </div>
+
+  <hr>
+  <button class="btn" id="resetAll" style="width:100%;min-height:48px;color:var(--crit);border-color:var(--crit)">Reset shift</button>
+  <p class="hint" style="text-align:center">Compiled 4 Aug 2026. Facts verified against CSLB, BBB and GAF records. Legal notes are research, not legal advice.</p>
+</section>
+
+</main>
+
+<div class="nudge" id="nudge"><span id="nudgeTxt"></span><button class="x" id="nudgeX">Got it</button></div>
+
+<nav><div class="tabs">
+  <button class="tab on" data-p="knock"><span class="ic">✋</span><span class="tl">Knock</span></button>
+  <button class="tab" data-p="say"><span class="ic">💬</span><span class="tl">Say</span></button>
+  <button class="tab" data-p="see"><span class="ic">🏠</span><span class="tl">See</span></button>
+  <button class="tab" data-p="stuck"><span class="ic">🛟</span><span class="tl">Stuck</span></button>
+  <button class="tab" data-p="day"><span class="ic">📋</span><span class="tl">Day</span></button>
+</div></nav>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= state (in memory — export before you close the tab) ============ */
+var S = {
+  running:false, startedAt:null, accumMs:0,
+  events:[],                                   // {t:ISO, type, auto?, lat?, lng?, acc?}
+  counts:{noans:0,contact:0,pitch:0,appt:0,callback:0,ni:0,skip:0},
+  cfg:{hours:4, rate:16, apptGoal:2, nudge:true, sens:'normal'},
+  wake:null,
+  geo:{ on:false, watchId:null, last:null, buf:[], since:0,
+        lastDoor:null, lastDoorAt:0, maxFromDoor:0, track:[], dist:0, autoCount:0 },
+  /* Accelerometer step detection. GPS can't reliably tell a slow walk from
+     standing still at 20 m house spacing; footsteps can. When motion is
+     available it becomes the stop/go signal and GPS only answers
+     "is this a different house?" — which it's plenty accurate for. */
+  mot:{ avail:false, on:false, steps:0, lastStep:0, mean:0, stepsAtDoor:0 }
+};
+var $ = function(id){ return document.getElementById(id); };
+var undoStack = [];
+
+/* Sensitivity presets.
+   dwell  = how long you must be stopped before it counts as a door
+   radius = how far you can drift and still count as "stopped" (GPS noise)
+   sep    = how far you must walk before the NEXT door can be logged     */
+var SENS = {
+  tight : { dwell:15000, radius:10, sep:12, note:'Tight: <b>15s</b> stopped, <b>12m</b> since the last door. For close-packed lots and townhomes.' },
+  normal: { dwell:20000, radius:12, sep:18, note:'Normal: logs a door after <b>20s</b> stopped, if you\'ve moved <b>18m</b> from the last one.' },
+  loose : { dwell:25000, radius:16, sep:28, note:'Big lots: <b>25s</b> stopped, <b>28m</b> since the last door. For wide frontage and long driveways.' }
+};
+
+/* ================= tabs ================= */
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('on'); });
+    document.querySelectorAll('.pane').forEach(function(x){ x.classList.remove('on'); });
+    t.classList.add('on');
+    $('p-' + t.dataset.p).classList.add('on');
+    window.scrollTo(0,0);
+    if(t.dataset.p === 'day') renderDay();
+  });
+});
+
+/* ================= timer ================= */
+function elapsedMs(){
+  return S.accumMs + (S.running && S.startedAt ? (Date.now() - S.startedAt) : 0);
+}
+function elapsedHrs(){ return elapsedMs()/3600000; }
+function fmt(ms){
+  if(ms < 0) ms = 0;
+  var s = Math.floor(ms/1000);
+  var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), q = s%60;
+  return h + ':' + String(m).padStart(2,'0') + ':' + String(q).padStart(2,'0');
+}
+function tick(){
+  var total = S.cfg.hours*3600000, el = elapsedMs(), left = total - el;
+  var c = $('clock');
+  c.textContent = fmt(Math.abs(left));
+  c.classList.toggle('over', left < 0);
+  $('clocklbl').textContent = !S.running && el===0 ? 'shift not started'
+                            : (left < 0 ? 'over — ' + fmt(el) + ' worked'
+                            : (S.running ? 'left in block' : 'paused'));
+  renderPace();
+}
+setInterval(tick, 1000);
+
+$('startBtn').addEventListener('click', function(){
+  if(S.running){
+    S.accumMs = elapsedMs(); S.running = false; S.startedAt = null;
+    this.textContent = 'Resume'; releaseWake();
+  } else {
+    S.running = true; S.startedAt = Date.now();
+    this.textContent = 'Pause'; requestWake();
+  }
+  tick();
+});
+
+/* ================= wake lock ================= */
+function requestWake(){
+  if(!('wakeLock' in navigator)){ $('wakeState').textContent = 'n/a'; return; }
+  navigator.wakeLock.request('screen').then(function(w){
+    S.wake = w; $('wakeState').textContent = 'On';
+    w.addEventListener('release', function(){ $('wakeState').textContent = 'Off'; });
+  }).catch(function(){ $('wakeState').textContent = 'Off'; });
+}
+function releaseWake(){
+  if(S.wake){ try{ S.wake.release(); }catch(e){} S.wake = null; }
+  $('wakeState').textContent = 'Off';
+}
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && S.running) requestWake();
+});
+$('wakeState').textContent = ('wakeLock' in navigator) ? 'Off' : 'n/a';
+
+/* ================= derived ================= */
+function doors(){ return S.counts.noans + S.counts.contact; }
+function convs(){ return S.counts.contact; }
+function contactRate(){ var d = doors(); return d ? S.counts.contact/d : 0; }
+
+/* ================= geo maths ================= */
+function dist(a, b){                                   // metres, haversine
+  var R = 6371000, r = Math.PI/180;
+  var dLat = (b.lat-a.lat)*r, dLng = (b.lng-a.lng)*r;
+  var s = Math.sin(dLat/2)*Math.sin(dLat/2) +
+          Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2*R*Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+/* ================= counting ================= */
+var LABEL = {noans:'No answer', contact:'Answered', pitch:'Pitched', appt:'APPT SET',
+             callback:'Callback', ni:'Not interested', skip:'Skipped'};
+var UPGRADE_WINDOW = 240000;                           // 4 min
+
+function snapshot(){
+  undoStack.push({ counts: JSON.parse(JSON.stringify(S.counts)),
+                   events: JSON.parse(JSON.stringify(S.events)),
+                   geo: { lastDoor:S.geo.lastDoor, lastDoorAt:S.geo.lastDoorAt,
+                          maxFromDoor:S.geo.maxFromDoor, autoCount:S.geo.autoCount,
+                          stepsAtDoor:S.mot.stepsAtDoor } });
+  if(undoStack.length > 40) undoStack.shift();
+}
+
+function autoStartShift(){
+  if(!S.running && elapsedMs() === 0){
+    S.running = true; S.startedAt = Date.now();
+    $('startBtn').textContent = 'Pause'; requestWake(); tick();
+  }
+}
+
+function logEvent(type, auto){
+  S.counts[type]++;
+  var e = { t:new Date().toISOString(), type:type };
+  if(auto) e.auto = true;
+  var p = S.geo.last;
+  if(p){ e.lat = p.lat; e.lng = p.lng; e.acc = Math.round(p.acc); }
+  S.events.push(e);
+}
+
+/* ANSWERED upgrades the door you just logged instead of adding a second one. */
+function tapAnswered(){
+  var now = Date.now();
+  for(var i = S.events.length - 1; i >= 0; i--){
+    var e = S.events[i];
+    if(now - new Date(e.t).getTime() > UPGRADE_WINDOW) break;
+    if(e.type === 'contact') break;                    // already answered here
+    if(e.type === 'noans'){
+      snapshot();
+      e.type = 'contact'; e.upgraded = true;
+      S.counts.noans--; S.counts.contact++;
+      render();
+      return true;
+    }
+  }
+  snapshot(); logEvent('contact'); render();
+  return false;
+}
+
+document.querySelectorAll('.kb').forEach(function(b){
+  b.addEventListener('click', function(){
+    var ev = b.dataset.ev;
+    autoStartShift();
+    if(ev === 'contact'){
+      var upgraded = tapAnswered();
+      if(navigator.vibrate) navigator.vibrate(12);
+      if(S.cfg.nudge) showNudge((upgraded ? 'Upgraded that door to a conversation. ' : '') +
+                                'Send the RepCard before you walk away.');
+      return;
+    }
+    snapshot(); logEvent(ev);
+    if(navigator.vibrate) navigator.vibrate(ev === 'appt' ? [18,50,18] : 12);
+    render();
+    if(ev === 'appt') showNudge('Nice. Confirm it by text within 2 hours.');
+  });
+});
+
+$('undoBtn').addEventListener('click', function(){
+  var prev = undoStack.pop();
+  if(!prev){ showNudge('Nothing to undo.'); return; }
+  S.counts = prev.counts; S.events = prev.events;
+  S.geo.lastDoor = prev.geo.lastDoor; S.geo.lastDoorAt = prev.geo.lastDoorAt;
+  S.geo.maxFromDoor = prev.geo.maxFromDoor; S.geo.autoCount = prev.geo.autoCount;
+  S.mot.stepsAtDoor = prev.geo.stepsAtDoor;
+  render(); showNudge('Undone.');
+});
+
+/* ================= auto door detection ================= */
+function geoUnavailableReason(){
+  if(!('geolocation' in navigator)) return 'This browser has no location support.';
+  /* file:// reports itself as a secure context in some browsers but phone
+     browsers still refuse GPS to it, so check the protocol directly. */
+  if(location.protocol === 'file:' || window.isSecureContext === false) return 'insecure';
+  return null;
+}
+
+function showBanner(title, body){
+  $('geoBannerT').textContent = title;
+  $('geoBannerB').innerHTML = body;
+  $('geoBanner').classList.add('on');
+}
+
+$('autoBtn').addEventListener('click', function(){
+  if(S.geo.on){ stopGeo(); return; }
+  var why = geoUnavailableReason();
+  if(why === 'insecure'){
+    showBanner('Auto-logging needs an https:// address',
+      'Phone browsers block GPS for files opened straight from your downloads. ' +
+      'Put this page on a free host (60 seconds — see the note at the bottom of the DAY tab), ' +
+      'open that link, then Add to Home Screen. Manual tapping works fine in the meantime.');
+    return;
+  }
+  if(why){ showBanner('No GPS available', why); return; }
+  startMotion().then(startGeo);
+});
+
+function startGeo(){
+  $('autoBtn').textContent = 'Starting…';
+  S.geo.watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, {
+    enableHighAccuracy:true, maximumAge:0, timeout:20000
+  });
+  S.geo.on = true;
+  $('autoBtn').textContent = 'Turn off';
+  $('geoBanner').classList.remove('on');
+  autoStartShift();
+  renderAuto();
+}
+function stopGeo(){
+  if(S.geo.watchId !== null){ navigator.geolocation.clearWatch(S.geo.watchId); }
+  S.geo.watchId = null; S.geo.on = false; S.geo.buf = [];
+  stopMotion();
+  $('autoBtn').textContent = 'Turn on';
+  renderAuto();
+}
+function onGeoErr(err){
+  var m = { 1:['Location permission was denied',
+               'Open your browser settings for this page and allow Location, then hit Turn on again. ' +
+               'Everything still works by tapping.'],
+            2:['GPS signal unavailable',
+               'Move away from buildings or trees and try again. Manual tapping still works.'],
+            3:['GPS timed out',
+               'Weak signal right now. It will keep retrying — or just tap manually.'] }[err.code]
+        || ['Location error', 'Manual tapping still works.'];
+  showBanner(m[0], m[1]);
+  if(err.code === 1) stopGeo();
+}
+
+/* ---------- step detection ---------- */
+var STEP_TH = 1.15, STEP_REFRACTORY = 280;
+
+function onMotion(ev){
+  var a = ev.accelerationIncludingGravity || ev.acceleration;
+  if(!a || a.x === null) return;
+  var m = Math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+  S.mot.mean = S.mot.mean ? S.mot.mean*0.92 + m*0.08 : m;
+  var dev = m - S.mot.mean, now = Date.now();
+  if(dev > STEP_TH && now - S.mot.lastStep > STEP_REFRACTORY){
+    S.mot.steps++; S.mot.lastStep = now;
+    if(!S.mot.avail){ S.mot.avail = true; renderAuto(); }
+  }
+}
+
+function startMotion(){
+  if(S.mot.on) return Promise.resolve();
+  S.mot.on = true;
+  var go = function(){ window.addEventListener('devicemotion', onMotion, {passive:true}); };
+  if(typeof DeviceMotionEvent !== 'undefined' &&
+     typeof DeviceMotionEvent.requestPermission === 'function'){
+    return DeviceMotionEvent.requestPermission()
+      .then(function(r){ if(r === 'granted') go(); })
+      .catch(function(){});                       // silently fall back to GPS-only
+  }
+  go();
+  return Promise.resolve();
+}
+function stopMotion(){
+  window.removeEventListener('devicemotion', onMotion);
+  S.mot.on = false; S.mot.avail = false; S.mot.mean = 0;
+}
+
+/* Milliseconds we have been standing still, by the best signal we have. */
+function stillMs(){
+  var now = Date.now();
+  if(S.mot.avail){
+    // if we have never stepped since motion started, don't claim a huge dwell
+    if(!S.mot.lastStep) return 0;
+    return now - S.mot.lastStep;
+  }
+  return S.geo.since ? now - S.geo.since : 0;
+}
+function signalName(){ return S.mot.avail ? 'steps' : 'GPS'; }
+
+function tolerance(p){                                     // widen when GPS is poor
+  return Math.max(SENS[S.cfg.sens].radius, p.acc * 0.8);
+}
+
+/* How long have we been standing still?
+   Walk back through recent fixes; the oldest one still within `tol` of where we
+   are now marks the moment we stopped. A slow walk fails this within a few
+   seconds, so it can't masquerade as a dwell — which the naive
+   single-anchor version could not distinguish at 20 m house spacing. */
+function stationarySince(p){
+  var buf = S.geo.buf, tol = tolerance(p), since = p.t;
+  for(var i = buf.length - 1; i >= 0; i--){
+    if(dist(buf[i], p) <= tol) since = buf[i].t;
+    else break;
+  }
+  return since;
+}
+
+function onPos(pos){
+  var c = pos.coords;
+  var p = { lat:c.latitude, lng:c.longitude, acc:c.accuracy || 999, t:Date.now() };
+  var s = SENS[S.cfg.sens];
+
+  if(p.acc > 40){ renderAuto(); return; }                  // reject junk fixes entirely
+
+  var prev = S.geo.last;
+  if(prev){ var d = dist(prev, p); if(d > 2 && d < 100) S.geo.dist += d; }
+  S.geo.last = p;
+
+  var tr = S.geo.track;
+  if(!tr.length || dist(tr[tr.length-1], p) > 4) tr.push(p);
+
+  var buf = S.geo.buf;
+  buf.push(p);
+  while(buf.length > 2 && p.t - buf[0].t > 300000) buf.shift();   // keep 5 min
+
+  // distance from the last logged door — updated on EVERY fix
+  if(S.geo.lastDoor) S.geo.maxFromDoor = Math.max(S.geo.maxFromDoor, dist(S.geo.lastDoor, p));
+
+  S.geo.since = stationarySince(p);
+  checkDoor();
+  renderAuto();
+}
+
+/* The actual "that was a door" decision. Runs on every GPS fix AND on a timer,
+   so a door still lands while you're standing still and GPS has gone quiet. */
+function checkDoor(){
+  if(!S.geo.on) return;
+  var s = SENS[S.cfg.sens], p = S.geo.last, now = Date.now();
+  if(!p || S.geo.buf.length < 2) return;
+  /* Standing still is exactly when the OS throttles position updates, so this
+     window has to be generous — the last known fix is still the right place. */
+  if(now - p.t > 45000) return;
+
+  var farEnough  = !S.geo.lastDoor || S.geo.maxFromDoor >= s.sep;
+  var longEnough = !S.geo.lastDoorAt || (now - S.geo.lastDoorAt) >= 20000;
+  /* You must actually have WALKED since the last door. Without this, GPS drift
+     during a long conversation on one porch slowly creeps past the separation
+     threshold and invents a door you never knocked. */
+  var walked = !S.mot.avail || !S.geo.lastDoor ||
+               (S.mot.steps - S.mot.stepsAtDoor) >= 12;
+  if(stillMs() < s.dwell || !farEnough || !longEnough || !walked) return;
+
+  S.mot.stepsAtDoor = S.mot.steps;
+  S.geo.lastDoor = p; S.geo.lastDoorAt = now; S.geo.maxFromDoor = 0; S.geo.autoCount++;
+  snapshot(); logEvent('noans', true); render();
+  if(navigator.vibrate) navigator.vibrate([10,40,10]);
+  showNudge('Door logged. Tap ANSWERED if they open.');
+}
+
+function renderAuto(){
+  var box = $('autoBox'), s = SENS[S.cfg.sens];
+  if(!S.geo.on){
+    box.className = 'auto';
+    $('autoLbl').textContent = 'Auto-log doors';
+    $('gAcc').textContent = '—'; $('gMove').textContent = '—';
+    $('dwellFill').style.width = '0%';
+    $('gAuto').textContent = S.geo.autoCount;
+    return;
+  }
+  var p = S.geo.last;
+  $('gAuto').textContent = S.geo.autoCount;
+  if(!p){
+    box.className = 'auto live';
+    $('autoLbl').textContent = 'Finding you…';
+    return;
+  }
+
+  var stale = Date.now() - p.t;
+  $('gAcc').textContent = Math.round(p.acc);
+  $('gMove').textContent = S.geo.lastDoor ? Math.round(S.geo.maxFromDoor) : '—';
+
+  if(stale > 30000){
+    box.className = 'auto';
+    $('dwellFill').style.width = '0%';
+    $('autoLbl').textContent = 'GPS stalled — tap doors for now';
+    return;
+  }
+
+  var dwell = stillMs();
+  var moving = dwell < 4000;
+  var farEnough = !S.geo.lastDoor || S.geo.maxFromDoor >= s.sep;
+
+  if(!moving && farEnough){
+    $('dwellFill').style.width = Math.min(100, dwell / s.dwell * 100) + '%';
+    box.className = 'auto dwell';
+    var left = Math.max(0, Math.ceil((s.dwell - dwell)/1000));
+    $('autoLbl').textContent = left > 0 ? 'Stopped — logging in ' + left + 's' : 'Logging…';
+  } else {
+    $('dwellFill').style.width = '0%';
+    box.className = 'auto live';
+    $('autoLbl').textContent = !farEnough
+      ? 'Logged — walk to the next one'
+      : 'Walking — tracking (' + signalName() + ')';
+  }
+}
+setInterval(function(){ if(S.geo.on){ checkDoor(); renderAuto(); } }, 1000);
+
+document.querySelectorAll('#sens button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#sens button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    S.cfg.sens = b.dataset.s;
+    $('sensNote').innerHTML = SENS[S.cfg.sens].note;
+  });
+});
+
+/* ================= nudge ================= */
+var nudgeTimer = null;
+function showNudge(msg){
+  $('nudgeTxt').textContent = msg;
+  $('nudge').classList.add('show');
+  clearTimeout(nudgeTimer);
+  nudgeTimer = setTimeout(hideNudge, 4200);
+}
+function hideNudge(){ $('nudge').classList.remove('show'); }
+$('nudgeX').addEventListener('click', hideNudge);
+
+/* ================= render ================= */
+function renderPace(){
+  var hrs = elapsedHrs(), d = doors();
+  var rate = hrs > 0.02 ? d/hrs : 0;
+  $('paceRate').textContent = rate.toFixed(1);
+  var target = Math.max(1, S.cfg.hours * S.cfg.rate);
+  var pct = Math.min(100, d/target*100);
+  var f = $('paceFill');
+  f.style.width = pct + '%';
+  f.className = 'fill';
+  var expected = hrs * S.cfg.rate;
+  if(hrs < 0.1){ f.classList.add('good'); }
+  else if(d >= expected*0.95) f.classList.add('good');
+  else if(d >= expected*0.7)  f.classList.add('warn');
+  else f.classList.add('crit');
+
+  var msg;
+  if(hrs < 0.02) msg = 'Tap Start when you knock your first door.';
+  else if(d >= expected*0.95) msg = 'On pace — ' + d + ' of ' + target + ' doors.';
+  else msg = 'Behind by ' + Math.max(0, Math.round(expected - d)) + ' doors. Shorten the walk, not the pitch.';
+  $('paceMsg').textContent = msg;
+}
+
+function render(){
+  Object.keys(S.counts).forEach(function(k){
+    var el = $('c-' + k); if(el) el.textContent = S.counts[k];
+  });
+  $('t-doors').textContent = doors();
+  $('t-conv').textContent  = convs();
+  $('t-appt').textContent  = S.counts.appt;
+  $('t-doorsub').textContent = doors() ? Math.round(contactRate()*100) + '% opened' : ' ';
+  $('t-convsub').textContent = S.counts.pitch + ' pitched';
+  $('t-apptsub').textContent = S.counts.callback + ' callbacks';
+  var autoN = S.events.filter(function(e){ return e.auto; }).length;
+  $('t-doorsub').textContent = doors()
+    ? Math.round(contactRate()*100) + '% opened' + (autoN ? ' · ' + autoN + ' auto' : '')
+    : ' ';
+  renderPace(); renderAuto();
+
+  var L = $('log'), last = S.events.slice(-12).reverse();
+  if(!last.length){ L.innerHTML = '<div class="muted">Nothing logged yet.</div>'; }
+  else {
+    L.innerHTML = last.map(function(e){
+      var d = new Date(e.t);
+      return '<div>' + String(d.getHours()).padStart(2,'0') + ':' +
+             String(d.getMinutes()).padStart(2,'0') + '  ·  ' + LABEL[e.type] + '</div>';
+    }).join('');
+  }
+}
+
+function renderRoute(){
+  var pts = S.geo.track;
+  /* One pin per door. An appointment isn't a separate place — it promotes the
+     door it came from, so the map reads as houses rather than as events. */
+  var pins = [];
+  S.events.forEach(function(e){
+    if(e.lat && (e.type === 'noans' || e.type === 'contact')){
+      pins.push({ lat:e.lat, lng:e.lng, type:e.type });
+    } else if(e.type === 'appt' || e.type === 'callback'){
+      for(var i = pins.length - 1; i >= 0; i--){
+        if(pins[i].type === 'contact'){ pins[i].type = e.type; break; }
+      }
+    }
+  });
+  var box = $('routeSvg');
+  $('routeDist').textContent = S.geo.dist > 40
+    ? (S.geo.dist/1000).toFixed(2) + ' km walked' : '';
+
+  if(pts.length < 2 && pins.length < 2){
+    box.innerHTML = '<p class="muted" style="margin:26px 0;text-align:center">' +
+      (S.geo.on ? 'Walking… your route builds as you go.'
+                : 'Turn on auto-logging and your route shows up here.') + '</p>';
+    return;
+  }
+
+  var all = pts.concat(pins);
+  var lats = all.map(function(p){ return p.lat; }), lngs = all.map(function(p){ return p.lng; });
+  var minLat = Math.min.apply(null,lats), maxLat = Math.max.apply(null,lats);
+  var minLng = Math.min.apply(null,lngs), maxLng = Math.max.apply(null,lngs);
+  var lat0 = (minLat+maxLat)/2, kx = Math.cos(lat0*Math.PI/180);
+
+  var W = 320, H = 190, pad = 16;
+  var spanX = Math.max(1e-6, (maxLng-minLng)*kx), spanY = Math.max(1e-6, maxLat-minLat);
+  var sc = Math.min((W-2*pad)/spanX, (H-2*pad)/spanY);
+  var ox = (W - spanX*sc)/2, oy = (H - spanY*sc)/2;
+  var X = function(p){ return ox + (p.lng-minLng)*kx*sc; };
+  var Y = function(p){ return oy + (maxLat-p.lat)*sc; };
+
+  var path = pts.map(function(p,i){
+    return (i?'L':'M') + X(p).toFixed(1) + ' ' + Y(p).toFixed(1);
+  }).join(' ');
+
+  var COL = { noans:'#898781', contact:'#2a78d6', appt:'#0ca30c', callback:'#eda100' };
+  var dots = pins.map(function(p){
+    var r = p.type === 'appt' ? 5.5 : 4;
+    return '<circle cx="' + X(p).toFixed(1) + '" cy="' + Y(p).toFixed(1) + '" r="' + r +
+           '" fill="' + (COL[p.type]||'#898781') + '" stroke="#fcfcfb" stroke-width="2"/>';
+  }).join('');
+
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+    'aria-label="Route walked this shift with a marker at each door">' +
+    '<path d="' + path + '" fill="none" stroke="#c3c2b7" stroke-width="2" ' +
+    'stroke-linejoin="round" stroke-linecap="round"/>' + dots + '</svg>';
+}
+
+function renderDay(){
+  renderRoute();
+  var d = doors(), c = convs(), a = S.counts.appt, hrs = elapsedHrs();
+  $('s-doors').textContent = d;
+  $('s-conv').textContent  = c;
+  $('s-appt').textContent  = a;
+  $('s-rate').textContent  = d ? Math.round(contactRate()*100) + '%' : '—';
+  $('s-per').textContent   = a ? (c/a).toFixed(0) : (c ? c + '+' : '—');
+  $('s-hr').textContent    = hrs > 0.05 ? (d/hrs).toFixed(1) : '0';
+
+  var out = [];
+  if(d < 15){ out.push('<p class="muted">Not enough doors yet to diagnose anything. Knock 40+ first.</p>'); }
+  else {
+    var cr = contactRate();
+    if(cr < 0.20) out.push('<p><b>Doors → contact is low (' + Math.round(cr*100) + '%).</b> That is almost always <i>timing and territory</i>, not your pitch. Push your block toward 1–5pm and prioritise streets with retirees or stay-at-home residents. Target is 25–35%.</p>');
+    else out.push('<p><b>Contact rate ' + Math.round(cr*100) + '% — that is healthy.</b> Doors are not your problem.</p>');
+
+    if(c > 0){
+      var pr = S.counts.pitch / c;
+      if(pr < 0.45) out.push('<p><b>Contact → pitch is low.</b> They open and you are not getting into it. That is the <i>opener</i>. Go say the first fifteen seconds out loud twenty times before your next shift — specific damage, specific location, then the ownership question.</p>');
+    }
+    if(S.counts.pitch >= 8 && a === 0) out.push('<p><b>You are pitching and not closing.</b> That is the last twenty seconds. Are you offering two specific times, or asking "when works for you"? Ask for a slot, not a preference.</p>');
+    if(a > 0 && c/a <= 25) out.push('<p><b>' + (c/a).toFixed(0) + ' conversations per appointment — that is at or better than benchmark.</b> Do not change the pitch. Just add doors.</p>');
+    if(hrs > 0.5 && d/hrs < 12) out.push('<p><b>' + (d/hrs).toFixed(1) + ' doors an hour is slow.</b> You are probably over-thinking each door or walking too far between them. Work one side of a street at a time.</p>');
+  }
+  $('diagnosis').innerHTML = out.join('');
+}
+
+/* ================= settings ================= */
+$('setHours').addEventListener('input', function(){ S.cfg.hours = +this.value || 4; tick(); });
+$('setRate').addEventListener('input',  function(){ S.cfg.rate  = +this.value || 16; renderPace(); });
+$('setAppt').addEventListener('input',  function(){ S.cfg.apptGoal = +this.value || 2; });
+$('nudgeToggle').addEventListener('click', function(){
+  S.cfg.nudge = !S.cfg.nudge; this.textContent = S.cfg.nudge ? 'On' : 'Off';
+});
+$('resetAll').addEventListener('click', function(){
+  if(!confirm('Reset the shift? Download the CSV first if you have not.')) return;
+  S.running=false; S.startedAt=null; S.accumMs=0; S.events=[]; undoStack=[];
+  Object.keys(S.counts).forEach(function(k){ S.counts[k]=0; });
+  S.geo.buf=[]; S.geo.since=0; S.geo.lastDoor=null; S.geo.lastDoorAt=0;
+  S.geo.maxFromDoor=0; S.geo.track=[]; S.geo.dist=0; S.geo.autoCount=0;
+  S.mot.steps=0; S.mot.lastStep=0; S.mot.stepsAtDoor=0;
+  $('startBtn').textContent = 'Start shift';
+  $('onefix').value=''; $('notes').value='';
+  releaseWake(); render(); renderDay(); tick();
+});
+
+/* ================= export ================= */
+function summaryText(){
+  var d = doors(), c = convs(), a = S.counts.appt, hrs = elapsedHrs();
+  return [
+    'TIDAL SHIFT — ' + new Date().toLocaleDateString(),
+    'Worked: ' + fmt(elapsedMs()),
+    '',
+    'Doors: ' + d,
+    'Conversations: ' + c + (d ? '  (' + Math.round(contactRate()*100) + '% contact rate)' : ''),
+    'Pitched: ' + S.counts.pitch,
+    'APPOINTMENTS: ' + a,
+    'Callbacks: ' + S.counts.callback,
+    'Not interested: ' + S.counts.ni,
+    'Skipped (sign/gate): ' + S.counts.skip,
+    'Doors/hr: ' + (hrs>0.05 ? (d/hrs).toFixed(1) : '0'),
+    '',
+    'Tomorrow\'s one fix: ' + ($('onefix').value || '—'),
+    '',
+    'Notes:',
+    ($('notes').value || '—')
+  ].join('\n');
+}
+$('copyBtn').addEventListener('click', function(){
+  var t = summaryText();
+  var done = function(){ showNudge('Summary copied. Paste it to your manager.'); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(function(){ legacyCopy(t); done(); });
+  } else { legacyCopy(t); done(); }
+});
+function legacyCopy(t){
+  var ta = document.createElement('textarea');
+  ta.value = t; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+$('dlBtn').addEventListener('click', function(){
+  var rows = [['timestamp','event','logged_by','latitude','longitude','gps_accuracy_m','map_link']]
+    .concat(S.events.map(function(e){
+      return [e.t, LABEL[e.type], e.auto ? 'auto' : 'tapped',
+              e.lat != null ? e.lat.toFixed(6) : '', e.lng != null ? e.lng.toFixed(6) : '',
+              e.acc != null ? e.acc : '',
+              e.lat != null ? 'https://maps.google.com/?q=' + e.lat.toFixed(6) + ',' + e.lng.toFixed(6) : ''];
+    }));
+  rows.push([]); rows.push(['SUMMARY','']);
+  summaryText().split('\n').forEach(function(l){ rows.push([l,'']); });
+  var csv = rows.map(function(r){
+    return r.map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
+  }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tidal-shift-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+  showNudge('CSV downloaded.');
+});
+
+/* ================= script stepper ================= */
+var STEPS = [
+  { tag:'Memorise verbatim', h:'1 · Opener',
+    say:'"Morning! Beautiful home. I\'m <em>[your name]</em> with Tidal Remodeling — we\'re the roofing company down on Avenida Encinas in Carlsbad. Reason I stopped is I was walking past and noticed <em>[specific damage, specific location]</em>. Quick question — how long have you owned the place?"',
+    why:'Compliment = a small genuine gift. A <b>specific</b> thing in a <b>specific</b> place proves you actually looked at their house — that is what separates you from every other canvasser. The ownership question is an easy yes that starts a conversation instead of a pitch, and it qualifies for ownership and roof age at once.' },
+
+  { tag:'Warm it', h:'2 · Acknowledge, then repeat the sighting',
+    say:'"Twelve years — nice. So like I said, the reason I stopped: <em>[repeat the damage]</em>."',
+    why:'Repeating the observation after their answer makes it land as a reason rather than an opener. Use <b>their exact words</b> back wherever you can — verbatim mirroring is the strongest likability finding in the research.' },
+
+  { tag:'Educate', h:'3 · Damage + the honest consequence',
+    say:'Pick the true consequence for what you actually saw — see the SEE tab. Ridge caps: "that\'s a continuous open seam and those caps are all that covers it." Exposed mat: "the roof stops being repairable." Tile: the underlayment story. Fascia: "that\'s the one part I can see up close, and it\'s soft."',
+    why:'Education, not alarm. Every one of those is defensible, checkable, and survives a second opinion. The fear-chain version does not — and in a market with ten inches of rain a year it is mostly false anyway.' },
+
+  { tag:'Best line in the script', h:'4 · The commitment question',
+    say:'"Eventually you\'re going to get that taken care of, right?"',
+    why:'Commitment and consistency. They agree to a future action in principle, which makes the next step feel like following through rather than being sold. Do not change a word of this.' },
+
+  { tag:'If "no leaks"', h:'5 · The honest attic sequence',
+    say:'"Good — and that\'s actually normal. Here\'s the thing most homeowners don\'t know: a stain on the ceiling is the <em>last</em> thing that happens, not the first. By the time you see it in San Diego, water\'s usually been getting past the covering for more than a season. When\'s the last time anybody actually got up there and looked?<br><br>Six months ago? What were you looking for — decorations, or damage?<br><br>Right. And that\'s most people. Look, <em>I\'m not going to tell you what\'s up there, because I can\'t see it from the driveway and neither can anybody else.</em> What I can tell you is what I see from here, and that this roof is at the age where somebody should look."',
+    why:'Does everything the original did — establishes that no visible leak ≠ no problem, gets them reasoning alongside you — and the line about not being able to see it is the single strongest credibility move in the whole script. That is the moment they stop filing you under salesman.' },
+
+  { tag:'Close', h:'6 · Free assessment + two times',
+    say:'"So here\'s what I\'ll do. I\'ll get one of our guys out for a free assessment, and you\'ll get a written number so you\'ve got it for whenever you\'re ready — this year, in three years, whenever. No obligation, and <em>you\'re completely free to tell me it\'s not the right time.</em><br><br>I\'m <em>[your name]</em>, by the way — what\'s your name?<br><br>Good to meet you, <em>[name]</em>. I\'ve got tomorrow morning around ten, or Thursday afternoon around four — <em>which one\'s easier?</em>"',
+    why:'Four moves. Free assessment = a low-commitment foot in the door. "You\'re free to say no" reduces reactance and costs nothing. Getting their name <b>in conversation</b> then using it works — but the effect vanishes if it\'s obvious you read it off a mailbox, so never do that. And two specific times beat "when works for you," which invites "let me think about it."' },
+
+  { tag:'Immediately after', h:'7 · Before you walk away',
+    say:'Tap or scan the RepCard <em>while you are still standing there</em>. Then text within two hours: "Hey [name], Sam from Tidal — great meeting you at [street] today. Here\'s my card and the time we set: [day/time]."',
+    why:'Speed of follow-up is the highest-leverage variable in the whole process. And an appointment that came easily has elevated no-show risk — people say yes to end a conversation. Confirm by text within two hours, and again the day before.' }
+];
+var step = 0;
+function renderStep(){
+  var s = STEPS[step];
+  $('scriptCard').innerHTML =
+    '<div class="card lead"><span class="tag">' + s.tag + '</span><h3>' + s.h + '</h3>' +
+    '<div class="say">' + s.say + '</div>' +
+    '<p style="font-size:14px;margin-top:11px"><b>Why it works:</b> ' + s.why + '</p></div>';
+  $('dots').innerHTML = STEPS.map(function(_,i){
+    return '<span class="dot' + (i===step ? ' on' : '') + '"></span>';
+  }).join('');
+  $('prevStep').disabled = step===0;
+  $('nextStep').textContent = step === STEPS.length-1 ? 'Back to top' : 'Next →';
+}
+$('nextStep').addEventListener('click', function(){
+  step = (step + 1) % STEPS.length; renderStep(); window.scrollTo(0,0);
+});
+$('prevStep').addEventListener('click', function(){
+  if(step > 0){ step--; renderStep(); window.scrollTo(0,0); }
+});
+$('resetStep').addEventListener('click', function(){ step = 0; renderStep(); window.scrollTo(0,0); });
+
+/* ================= objections ================= */
+var OBJ = [
+  ['"Not interested."','Don\'t rebut — pivot to a question. <b>"Totally fair. Has anybody actually been up there in the last few years?"</b> Then offer a look, not a commitment.'],
+  ['"I don\'t think I have any damage."','<b>"You might not — and honestly that\'d be good news. What I can see from here is [specific thing], which doesn\'t mean you\'ve got a problem today. It means the roof\'s at the age where it\'s worth somebody looking."</b>'],
+  ['"We already have a roofer."','<b>"Good, that\'s better than most people. When were they last out?"</b> Then offer a documented second opinion rather than competing with them.'],
+  ['"I need to talk to my spouse."','<b>Do not pitch harder. Book both.</b> "Of course — what time works when you\'re both home?" Presenting twice kills deals, and a spouse who wasn\'t there is a guaranteed no.'],
+  ['"Can you just give me a price?"','<b>"I\'d be guessing from the driveway and you\'d be mad at me later. That\'s what the assessment is for — you\'ll get a real written number."</b> This also keeps you inside the appointment-setter lane.'],
+  ['"How much is the inspection?"','<b>"Free, and there\'s no obligation. Genuinely — you get a number and you can sit on it for three years if you want."</b>'],
+  ['"Are you a storm chaser?"','This one is a gift — your facts do all the work. <b>"Fair question. No — we\'re at 5375 Avenida Encinas in Carlsbad, been here since 2013, licence 984966. You can look it up right now."</b><br><br><i>Check with your manager which licence number to quote — Tidal has two active ones (984966 and 1135348, the USA Inc entity). Say the one that appears on the contract, or the mismatch is what a suspicious homeowner finds.</i>'],
+  ['"I just had it done."','<b>"Oh good — how long ago? Who did it?"</b> If it\'s recent it\'s a real no. Be gracious, ask if they know anyone on the street, leave the card. Referrals from happy homeowners are worth more than a forced pitch.'],
+  ['"No time right now."','Two specific slots, never an open question. <b>"No problem — later this week, or is next Tuesday easier?"</b>'],
+  ['"Just leave me a card."','Give it — RepCard, tapped or scanned so you get the notification — then still ask for the two-option close <b>once</b>. If it\'s still no, leave graciously.'],
+  ['"You\'re bothering me."','One line of empathy, offer to leave, leave. <b>"Totally fair, I\'ll get out of your hair. Have a good one."</b> You\'ll knock this street again in six weeks and you want to be the guy who left politely.'],
+  ['"No soliciting" sign','<b>Leave. No knock, no pitch.</b> Not a technique question — in San Diego proper, ignoring a posted sign is its own misdemeanour.']
+];
+$('objList').innerHTML = OBJ.map(function(o){
+  return '<details><summary>' + o[0] + '</summary><div class="dbody"><p>' + o[1] + '</p></div></details>';
+}).join('');
+
+/* ================= go ================= */
+$('sensNote').innerHTML = SENS[S.cfg.sens].note;
+if(geoUnavailableReason() === 'insecure'){
+  $('autoBody').innerHTML = 'Uses GPS to log a door every time you stop at one, so you only tap when ' +
+    'someone answers. <b>Needs an https:// link to work</b> — see “Getting auto-logging working” on the DAY tab. ' +
+    'Tapping works fine either way.';
+}
+renderStep(); render(); tick();
+})();
+</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})});</script>
+</body>
+</html>

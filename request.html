@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fcfcfb">
+<title>Free Roof Assessment — Tidal Remodeling</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+
+<style>
+  :root{
+    --surface:#fcfcfb; --plane:#f4f3f0; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --line:#c3c2b7; --accent:#2a78d6; --accent-soft:#cde2fb;
+    --good:#0ca30c; --warn:#fab219;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--plane);color:var(--ink);
+       font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:520px;margin:0 auto;background:var(--surface);min-height:100vh;
+        padding:0 0 40px;box-shadow:0 0 0 1px var(--grid)}
+  .top{padding:26px 22px 20px;border-bottom:1px solid var(--grid)}
+  .brand{font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:27px;line-height:1.2;margin:9px 0 8px;letter-spacing:-.02em}
+  .sub{color:var(--ink-2);font-size:16px;margin:0}
+
+  /* live status */
+  .status{margin:18px 22px 0;border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .status.open{background:#e9f6e9;border-left:4px solid var(--good)}
+  .status.closed{background:#fdf4e3;border-left:4px solid var(--warn)}
+  .status .dot{width:10px;height:10px;border-radius:99px;margin-top:6px;flex:none}
+  .status.open .dot{background:var(--good);box-shadow:0 0 0 4px rgba(12,163,12,.16)}
+  .status.closed .dot{background:var(--warn)}
+  .status b{display:block;font-size:15px;margin-bottom:2px}
+  .status span{font-size:14px;color:var(--ink-2)}
+
+  form{padding:20px 22px 0}
+  label{display:block;font-size:13px;font-weight:700;letter-spacing:.02em;margin:16px 0 6px;color:var(--ink)}
+  label .opt{font-weight:500;color:var(--muted);letter-spacing:0}
+  input,select,textarea{
+    width:100%;border:1.5px solid var(--line);border-radius:11px;padding:14px 13px;
+    font:16px system-ui,sans-serif;color:var(--ink);background:var(--surface)}
+  input:focus,select,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  textarea{min-height:88px;resize:vertical;font-family:system-ui,sans-serif}
+  .err{border-color:#d03b3b !important}
+  .errmsg{color:#a52a2a;font-size:13px;margin-top:5px;display:none}
+  .errmsg.on{display:block}
+
+  button.submit{
+    width:100%;margin-top:24px;min-height:56px;border:0;border-radius:12px;
+    background:var(--ink);color:#fff;font:700 17px system-ui,sans-serif;cursor:pointer}
+  button.submit:active{opacity:.85}
+  button.submit:disabled{opacity:.5;cursor:default}
+
+  .fine{font-size:13px;color:var(--muted);margin-top:14px;line-height:1.55}
+
+  .trust{margin:26px 22px 0;border-top:1px solid var(--grid);padding-top:20px}
+  .trust h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 12px}
+  .tr{display:flex;gap:11px;align-items:flex-start;margin-bottom:12px;font-size:14px;color:var(--ink-2)}
+  .tr .k{color:var(--accent);font-weight:800;flex:none;width:17px;text-align:center}
+  .tr b{color:var(--ink)}
+
+  /* success */
+  .done{display:none;padding:40px 22px;text-align:center}
+  .done.on{display:block}
+  .check{width:64px;height:64px;border-radius:99px;background:#e9f6e9;color:var(--good);
+         display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto 18px}
+  .done h2{font-size:24px;margin:0 0 10px;letter-spacing:-.02em}
+  .done p{color:var(--ink-2);margin:0 0 16px}
+  .when{background:var(--accent-soft);border-radius:12px;padding:16px;margin:20px 0;font-size:16px}
+  .when b{display:block;font-size:19px;margin-bottom:4px}
+  .fallback{display:none;margin-top:18px}
+  .fallback.on{display:block}
+  .fallback a{display:block;margin-top:9px;padding:15px;border:1.5px solid var(--line);border-radius:11px;
+              text-decoration:none;color:var(--ink);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand" id="brandLine">Tidal Remodeling · Carlsbad</div>
+    <h1>Free roof assessment</h1>
+    <p class="sub">No cost, no obligation. You'll get a written number you can sit on for as long as you like.</p>
+  </div>
+
+  <div class="status" id="status">
+    <span class="dot"></span>
+    <div><b id="statusTitle">Checking office hours…</b><span id="statusSub"></span></div>
+  </div>
+
+  <form id="f" novalidate>
+    <label for="name">Your name</label>
+    <input id="name" name="name" autocomplete="name" placeholder="First and last">
+    <div class="errmsg" id="e-name">Please add your name.</div>
+
+    <label for="phone">Phone</label>
+    <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(760) 555-0123">
+    <div class="errmsg" id="e-phone">We need a number to call you back on.</div>
+
+    <label for="address">Property address</label>
+    <input id="address" name="address" autocomplete="street-address" placeholder="Street, city">
+    <div class="errmsg" id="e-address">Please add the address of the property.</div>
+
+    <label for="email">Email <span class="opt">— optional</span></label>
+    <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com">
+
+    <label for="best">Best time to reach you</label>
+    <select id="best" name="best">
+      <option>Any time during business hours</option>
+      <option>Morning (9am – 12pm)</option>
+      <option>Afternoon (12pm – 5pm)</option>
+      <option>Text me first</option>
+    </select>
+
+    <label for="notes">What did you notice? <span class="opt">— optional</span></label>
+    <textarea id="notes" name="notes" placeholder="Age of the roof, anything you've seen, a leak, or just want it looked at…"></textarea>
+
+    <button class="submit" id="go" type="submit">Request my free assessment</button>
+
+    <p class="fine">
+      Submitting this asks a Tidal Remodeling representative to call you about a free assessment.
+      It is not a contract and does not commit you to anything. California gives you three business
+      days to cancel any home improvement contract signed at your home — five if you're 65 or older.
+    </p>
+  </form>
+
+  <div class="trust">
+    <h2>Who you're talking to</h2>
+    <div class="tr"><span class="k">✓</span><div><b>CSLB Licence #984966</b> — Class B General Building, current and active, bonded. Verify it yourself at <b>cslb.ca.gov</b>.</div></div>
+    <div class="tr"><span class="k">✓</span><div><b>GAF Master Elite®</b> certified — GAF's top contractor tier. Qualifying roof systems are eligible for GAF's Golden Pledge® Limited Warranty.</div></div>
+    <div class="tr"><span class="k">✓</span><div><b>BBB Accredited since 2023, rated A.</b></div></div>
+    <div class="tr"><span class="k">✓</span><div><b>Local since 2013</b> — 5375 Avenida Encinas, Suite A, Carlsbad, CA 92008.</div></div>
+    <div class="tr"><span class="k">✓</span><div><b>Office (760) 990-7890</b> — Monday to Friday, 9am to 5pm.</div></div>
+  </div>
+
+  <div class="done" id="done">
+    <div class="check">✓</div>
+    <h2>Got it, <span id="doneName">thanks</span>.</h2>
+    <p>Your request is in.</p>
+    <div class="when"><b id="whenBig"></b><span id="whenSmall"></span></div>
+    <p class="fine" id="refline"></p>
+    <div class="fallback" id="fallback">
+      <p class="fine">One more tap to make sure it reaches the office:</p>
+      <a id="smsLink" href="#">📱 Send it as a text message</a>
+      <a id="mailLink" href="#">✉️ Send it as an email</a>
+      <a id="callLink" href="tel:+17609907890">📞 Or just call (760) 990-7890</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════
+   SETUP — edit these five lines, save, done.
+   ═══════════════════════════════════════════════════════════════════ */
+var CONFIG = {
+
+  // Your name, as it should appear at the top of the page.
+  repName: 'Sam',
+
+  // Your mobile. Submissions get texted here as a backup. Digits only.
+  repMobile: '',
+
+  // Tidal's office line. Verified: (760) 990-7890
+  officePhone: '7609907890',
+
+  // Leave both blank on the deployed site — submissions go to /api/leads,
+  // which holds the sheet credentials server-side. Only fill these in if you
+  // are running the file off a laptop with no server, in which case it posts
+  // to Apps Script directly.
+  //
+  // Either way, if the backend is unreachable the page still works: it falls
+  // back to opening a pre-filled text or email on the homeowner's own phone.
+  endpoint: '',
+  token: '',
+
+  // Office hours, Pacific time. 0 = Sunday. Verified: Mon–Fri 9–5.
+  officeOpenHour: 9,
+  officeCloseHour: 17,
+  officeDays: [1,2,3,4,5]
+};
+/* ═══════════════════════════════════════════════════════════════════ */
+
+var $ = function(id){ return document.getElementById(id); };
+
+if(CONFIG.repName){
+  $('brandLine').textContent = CONFIG.repName + ' · Tidal Remodeling · Carlsbad';
+}
+
+/* ---------- what time is it in Pacific, wherever the visitor is ---------- */
+function pacificNow(){
+  var parts = new Intl.DateTimeFormat('en-US', {
+    timeZone:'America/Los_Angeles', weekday:'short', hour:'numeric',
+    minute:'numeric', hour12:false
+  }).formatToParts(new Date());
+  var g = {};
+  parts.forEach(function(p){ g[p.type] = p.value; });
+  var days = {Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+  var h = parseInt(g.hour,10);
+  if(h === 24) h = 0;                                   // some engines emit 24
+  return { day: days[g.weekday], hour: h, minute: parseInt(g.minute,10) };
+}
+
+function isOpen(){
+  var n = pacificNow();
+  return CONFIG.officeDays.indexOf(n.day) !== -1 &&
+         n.hour >= CONFIG.officeOpenHour && n.hour < CONFIG.officeCloseHour;
+}
+
+var DAYNAME = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+/* When does the office next open? Returns e.g. "tomorrow morning at 9am"
+   or "Monday morning at 9am". */
+function nextOpenPhrase(){
+  var n = pacificNow();
+  // Later today?
+  if(CONFIG.officeDays.indexOf(n.day) !== -1 && n.hour < CONFIG.officeOpenHour){
+    return { key:'today', text:'this morning at ' + hr(CONFIG.officeOpenHour) };
+  }
+  for(var i = 1; i <= 7; i++){
+    var d = (n.day + i) % 7;
+    if(CONFIG.officeDays.indexOf(d) !== -1){
+      var lead = (i === 1) ? 'tomorrow' : DAYNAME[d];
+      return { key:'later', text:lead + ' morning at ' + hr(CONFIG.officeOpenHour) };
+    }
+  }
+  return { key:'later', text:'the next business morning' };
+}
+function hr(h){
+  var ap = h >= 12 ? 'pm' : 'am', v = h % 12; if(v === 0) v = 12;
+  return v + ap;
+}
+
+function renderStatus(){
+  var box = $('status');
+  if(isOpen()){
+    box.className = 'status open';
+    $('statusTitle').textContent = 'The office is open right now';
+    $('statusSub').textContent = 'Submit this and someone will call you shortly — usually within the hour.';
+  } else {
+    box.className = 'status closed';
+    var np = nextOpenPhrase();
+    $('statusTitle').textContent = 'The office is closed right now';
+    $('statusSub').textContent = 'Send it anyway — it will be waiting first thing, and you\'ll get a call ' + np.text + '.';
+  }
+}
+renderStatus();
+setInterval(renderStatus, 60000);
+
+/* ---------- validation ---------- */
+var REQ = ['name','phone','address'];
+function validate(){
+  var ok = true;
+  REQ.forEach(function(id){
+    var el = $(id), bad = !el.value.trim();
+    if(id === 'phone' && el.value.trim()){
+      bad = el.value.replace(/\D/g,'').length < 10;
+      $('e-phone').textContent = bad ? 'That doesn\'t look like a full phone number.'
+                                     : 'We need a number to call you back on.';
+    }
+    el.classList.toggle('err', bad);
+    $('e-' + id).classList.toggle('on', bad);
+    if(bad) ok = false;
+  });
+  return ok;
+}
+REQ.forEach(function(id){
+  $(id).addEventListener('input', function(){
+    if(this.classList.contains('err')){
+      this.classList.remove('err'); $('e-' + id).classList.remove('on');
+    }
+  });
+});
+
+/* ---------- payload ---------- */
+function payload(){
+  return {
+    name: $('name').value.trim(),
+    phone: $('phone').value.trim(),
+    address: $('address').value.trim(),
+    email: $('email').value.trim(),
+    bestTime: $('best').value,
+    notes: $('notes').value.trim(),
+    rep: CONFIG.repName,
+    submittedAt: new Date().toString(),
+    officeOpenAtSubmit: isOpen() ? 'YES — call now' : 'NO — call next business morning'
+  };
+}
+function asText(p){
+  return 'NEW LEAD (self-submitted' + (p.rep ? ' via ' + p.rep : '') + ')\n' +
+         'Name: '   + p.name + '\n' +
+         'Phone: '  + p.phone + '\n' +
+         'Address: '+ p.address + '\n' +
+         (p.email ? 'Email: ' + p.email + '\n' : '') +
+         'Best time: ' + p.bestTime + '\n' +
+         (p.notes ? 'Notes: ' + p.notes + '\n' : '') +
+         'Submitted: ' + p.submittedAt + '\n' +
+         'Office open at submit: ' + p.officeOpenAtSubmit;
+}
+
+/* ---------- submit ---------- */
+$('f').addEventListener('submit', function(ev){
+  ev.preventDefault();
+  if(!validate()){
+    var first = document.querySelector('.err');
+    if(first) first.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  var btn = $('go');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  var p = payload();
+
+  var direct  = Boolean(CONFIG.endpoint);
+  var target  = direct ? CONFIG.endpoint : '/api/leads';
+  /* Direct-to-Apps-Script needs text/plain (it cannot answer a CORS
+     preflight). Our own API route is same-origin, so JSON is fine. */
+  var headers = direct ? {'Content-Type':'text/plain;charset=utf-8'}
+                       : {'Content-Type':'application/json'};
+  {
+    fetch(target, {
+      method:'POST', redirect:'follow',
+      headers: headers,
+      body: JSON.stringify({ token:CONFIG.token, action:'create', lead:{
+        name:p.name, phone:p.phone, email:p.email, address:p.address,
+        city:'', source:'qr', stage:'new', temp:'warm',
+        notes:[p.notes, 'Best time: ' + p.bestTime].filter(Boolean).join(' | '),
+        rep:CONFIG.repName
+      }})
+    }).then(function(r){ return r.json(); })
+      .then(function(j){ succeed(p, !!(j && j.ok)); })
+      .catch(function(){ succeed(p, false); });
+  }
+});
+
+function succeed(p, delivered){
+  $('f').style.display = 'none';
+  document.querySelector('.trust').style.display = 'none';
+  $('status').style.display = 'none';
+  $('done').classList.add('on');
+  $('doneName').textContent = p.name.split(' ')[0] || 'thanks';
+
+  if(isOpen()){
+    $('whenBig').textContent   = 'Expect a call shortly';
+    $('whenSmall').textContent = 'The office is open now — usually within the hour, on ' + p.phone + '.';
+  } else {
+    var np = nextOpenPhrase();
+    $('whenBig').textContent   = 'You\'ll get a call ' + np.text;
+    $('whenSmall').textContent = 'The office is closed right now, so your request is first in the queue when it opens. Monday to Friday, 9 to 5.';
+  }
+
+  $('refline').textContent = 'If you\'d rather not wait, the office is (760) 990-7890.';
+
+  if(!delivered){
+    $('fallback').classList.add('on');
+    var body = encodeURIComponent(asText(p));
+    var to = CONFIG.repMobile || CONFIG.officePhone;
+    var ua = navigator.userAgent || '';
+    var sep = /iPhone|iPad|iPod|Mac OS X/i.test(ua) ? '&' : '?';
+    $('smsLink').href  = 'sms:' + to + sep + 'body=' + body;
+    $('mailLink').href = 'mailto:hello@tidalremodeling.com?subject=' +
+                         encodeURIComponent('New lead — ' + p.name + ', ' + p.address) +
+                         '&body=' + body;
+    $('callLink').href = 'tel:+1' + CONFIG.officePhone;
+  }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+})();
+</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})});</script>
+</body>
+</html>

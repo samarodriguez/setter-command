@@ -1,50 +1,109 @@
-# Setter Command
+# Tidal Field Kit
 
-Door-knocking field app for exterior home-improvement appointment setters (stucco, exterior paint, woodwork/eaves/fascia, roofing, turf — retail, no insurance claims). A RepCard-style knock logger with an end-of-day export back into RepCard.
+Door-knocking field kit for exterior remodeling appointment setting in North San Diego County.
+Four pages, one serverless route, no build step.
 
-## What it does
+| Route | What it is |
+|---|---|
+| `/` | Home. Add this to your phone's home screen. |
+| `/shift` | Shift tool. Auto-logs a door every time you stop at one (GPS + accelerometer), plus script, damage guide, objections, live pace and end-of-shift numbers. |
+| `/crm` | Lead CRM. Who to contact right now, filterable pipeline, appointment tracking with confirmation texts. |
+| `/request` | The homeowner-facing page behind your QR code. Requests a free assessment and says exactly when the office will call. Also at `/qr`. |
+| `/print` | Printable pocket card and QR leave-behinds. |
+| `/api/leads` | Serverless proxy to the Google Sheet. |
 
-- **Knocking (RepCard-style)** — four dispositions, big tap targets: **Not home · Not interested · Renting · Lead**. Every knock is timestamped; leads prompt you for owner info.
-- **Map** — satellite view where you can see every actual house (toggle to street map), GPS "locate me," tap a house to drop a door (auto reverse-geocoded), pins color-coded by disposition. Live knock mode times your doorstep dwell and auto-logs short stops as Not home.
-- **Knock route + directions** — one tap plans a walking route through your un-knocked doors (nearest-neighbor from where you stand), numbers the pins in order, draws the path, and gives turn-by-turn directions per stop (free OSRM routing) plus a "Go" deep link into Google Maps navigation for each house.
-- **Area planning** — draw a radius, and AI builds a knock plan + flags active rentals to skip + writes a manager summary.
-- **Public records** — "Pull records" returns owner name, owner-occupied vs rental (→ mark it Renting), year built, sale history (RentCast; optional key).
-- **Book** — ranks tomorrow's slots against your schedule. A Lead only exports once it has an appointment.
-- **EOD → RepCard** — one screen at the end of the day: today's disposition counts, CSV export (share sheet on your phone, RepCard import format), a warning for leads still missing appointments, and **Quick Fill** — tap-to-copy fields in RepCard's form order so you can punch doors into the RepCard app in seconds.
-- **Texting CRM** — per-contact threads, follow-up queue with due dates, canned templates, AI drafts in your voice. Sending always opens your phone's Messages app prefilled — texts go from your number, never auto-sent.
-- **Scripts** — psychology-backed openers, objection handlers, re-knock scripts, all built around the retail pitch: free exterior walk-around + written quote, crew-in-the-neighborhood pricing. No insurance-claim angles.
-- **Train** — three modes: **Full door** (16 personas covering edge cases: renters, no-soliciting signs, tight budgets, one-leggers, teens, dog chaos, curveball interruptions), **Section drills** (start the conversation at the exact moment you want to practice — opener, "how much", spouse lock-in, either/or close, re-knock…), and the **Objection gauntlet** (rapid-fire objections, every answer scored /10 with the better line). Voice in/out, coach hints, rubric scorecard.
-- **Stats** — contact rate, hot hours, AI pattern analysis, one-tap manager report.
+---
 
 ## Deploy
 
-Push to `main` — Vercel auto-deploys (project: `doorknockingapp`).
+Push to `main` and Vercel builds it. There is no build step — it's static files plus one
+Node function in `api/`, so `vercel.json` sets `framework: null`.
 
-## Environment variables (Vercel → Settings → Environment Variables)
+### Environment variables
 
-| Key | Powers | Required? |
-|-----|--------|-----------|
-| `ANTHROPIC_API_KEY` | Trainer, texts, area plans, reports, pattern analysis | For AI features. Get at console.anthropic.com |
-| `RENTCAST_API_KEY` | Owner records, year built, sale history, rental detection | Optional. Free tier 50/mo at app.rentcast.io/app/api |
+Set these in **Vercel → Settings → Environment Variables**, then **redeploy** — environment
+variables only take effect on a new deployment.
 
-Without keys, the app still logs knocks, maps, books, exports, and quick-fills — and deep-links to county records/Zillow instead of auto-pulling.
+| Key | What it does | Required? |
+|---|---|---|
+| `SHEETS_WEBAPP_URL` | The Apps Script web app URL from `docs/tidal-crm-backend.gs` | For lead capture |
+| `SHEETS_TOKEN` | The `TOKEN` value inside that script. Must match exactly. | For lead capture |
+| `CRM_PASSCODE` | A passcode you invent. Required to *read* the lead list. | For the CRM |
 
-## Honest limits (by design)
+Without them the pages all still work — the shift tool, script, damage guide, objections and
+printables need no backend at all. Only lead capture and the CRM go quiet, and they say so.
 
-- **No iMessage automation** — Apple locks iMessage; the app opens Messages with your text prefilled instead.
-- **No auto-blasting texts** — cold-texting strangers violates the TCPA. The app drafts and hands off; it never auto-sends.
-- **RepCard has no public write API** — export is via their CSV import plus the Quick Fill copy flow.
-- **Property data isn't free-unlimited** — RentCast's free tier is 50 lookups/month.
-- **GPS accuracy** — dwell auto-status works best with high-accuracy GPS on and the screen awake.
+### The Google Sheet backend
 
-## Local dev
+`docs/tidal-crm-backend.gs` turns a free Google Sheet into the database. Setup is in the
+comment block at the top of that file, and repeated in the CRM's SETUP tab. Roughly: new sheet →
+Extensions → Apps Script → paste → set `TOKEN` and `NOTIFY_EMAIL` → Deploy as a web app,
+executing as *Me*, access *Anyone* → copy the URL into `SHEETS_WEBAPP_URL`.
+
+It emails you the moment a homeowner submits. During office hours the subject line says
+**call now**; outside them it says which morning to call. Attach the `sendMorningDigest`
+function to a weekday 8–9am trigger and it also mails a digest of anything still uncalled.
+
+---
+
+## Why the API route exists
+
+Without it, the Apps Script URL and token would have to sit in client-side JavaScript, where
+anyone could read every customer record by viewing source. `api/leads.js` keeps them in
+environment variables instead.
+
+The two directions are deliberately asymmetric:
+
+- **Writing a new lead is open.** A homeowner filling in `/request` has no passcode. Input is
+  validated, length-capped, and has a honeypot field.
+- **Reading the list requires `CRM_PASSCODE`.** It contains names, phone numbers and home
+  addresses. If `CRM_PASSCODE` isn't set, reading is off entirely rather than open.
+
+The CRM sends the passcode as an `X-CRM-Key` header. You enter it once in SETUP, then
+**Get my link** bakes it into a URL you add to your home screen. That link is a credential —
+treat it like one.
+
+---
+
+## Offline
+
+`sw.js` precaches the shell and serves network-first with a cache fallback, because canyon
+neighbourhoods and dead zones are normal here. `/api/` is never cached — stale lead data would
+be worse than no lead data.
+
+Bump `VERSION` in `sw.js` on any deploy where you want clients to drop their cached copies.
+`activate` deletes every cache that isn't the current version.
+
+---
+
+## Local development
 
 ```bash
-npm install
-cp .env.example .env.local   # paste your keys
-npm run dev                  # http://localhost:3000
+npm run dev        # serves the static files on :3000
 ```
 
-Data is stored in your browser (localStorage), per device. Export CSV regularly so you don't lose your log.
+That serves the pages but not `/api/leads` — for the full thing use `npx vercel dev`, which
+runs the function too, with a `.env.local` copied from `.env.example`.
 
-Booking hours live in `lib/constants.js` → `HOURS` (0=Sun … 6=Sat, 24h). Dwell thresholds are in `lib/geo.js`. Trainer personas/sections/objections are in `components/TrainTab.jsx`.
+---
+
+## Notes that matter more than the code
+
+**Clear this with your manager before using it.** Leads are usually company property and Tidal
+requires RepCard. The safe framing is that RepCard is the system of record and this is a personal
+working layer on top of it.
+
+**The script content is deliberately not the standard one.** The mold / termite / "moisture is
+getting in right now" chain that circulates in canvassing scripts is factually weak in a climate
+with ~10 inches of rain a year, and asserting unobserved damage to procure a contract is a
+misdemeanour under California B&P §7161(b) — which reaches the *solicitor* personally, not just
+the contractor. `docs/PLAYBOOK.md` has the reasoning and the replacement wording.
+
+**Verified company facts only.** CSLB #984966 (note there is a second licence, #1135348, for
+Tidal Remodeling USA Inc — confirm which entity writes the contracts before quoting a number at
+a door), GAF Master Elite, BBB Accredited since 2023 rated **A** — not A+. Financing and Owens
+Corning / CertainTeed certification could not be verified; don't claim them.
+
+**Location data never leaves the phone.** The shift tool's GPS track, door counts and notes are
+held in memory and exported by you. Nothing is uploaded. Only leads you explicitly save go to
+your sheet.
